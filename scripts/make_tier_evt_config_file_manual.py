@@ -32,30 +32,35 @@ from legendmeta import JsonDB, LegendMetadata
 parser = argparse.ArgumentParser(description="Create evt tier config files for LEGEND simulation production"
 )
 
-parser.add_argument("--metadata", "-m", type=str, help="Path to proudction cycle to take legend-metadata",default="/data2/public/prodenv/prod-blind/ref-v1.0.0/")
+parser.add_argument("--metadata", "-m", type=str, help="Path to proudction cycle to take legend-metadata",default="/data2/public/prodenv/prod-blind/ref-v1.1.0/")
+parser.add_argument("--prod_dir", "-p", type=str, help="Path to proudction cycle to take legend-metadata",default="/data2/public/prodenv/prod-blind/ref-v1.0.1/")
 parser.add_argument("--hit_name", "-H", type=str, help="Name for the hit tier - either hit or pht",default="pht")
+parser.add_argument("--dataset", "-d", type=str, help="Dataset to produce evt tier cfg for 'vancouver', 'p10', or 'p02'",default="vancouver")
 
-dataset="p10"
 args= parser.parse_args()
 
-prod_dir =args.metadata
+prod_dir =args.prod_dir
+metadata = args.metadata
 hit_name =args.hit_name
+dataset=args.dataset
 
-lmeta = LegendMetadata(f"{prod_dir}/inputs")
+lmeta = LegendMetadata(f"{metadata}/inputs")
 runs=lmeta.dataprod.config.analysis_runs
-
+print(runs)
 if (dataset=="vancouver"):
-    runlist = (
-        [f"l200-p03-r00{r}-phy" for r in range(6)]
-        + [f"l200-p04-r00{r}-phy" for r in range(4)]
-        + [f"l200-p06-r00{r}-phy" for r in range(7)]
-        + [f"l200-p07-r00{r}-phy" for r in range(1, 7)]
-        + [f"l200-p08-r00{r}-phy" for r in range(5)]
-        + [f"l200-p08-r00{r}-phy" for r in range(6, 10)]
-    )
+    runlist=[]
+    for per in runs.keys():
+        for run in runs[per]:
+            runlist.append(f"l200-{per}-{run}-phy")
+    runlist=(runlist)
 elif (dataset=="p10"):
+    runlist = []
+    runs["p10"]=["r000","r001","r003","r004","r005","r006"]
+    for run in runs["p10"]:
+        runlist.append(f"l200-p10-{run}-phy")
+elif (dataset=="p02"):
     runlist = (
-        [f"l200-p10-r00{r}-phy" for r in range(4)]
+        [f"l200-p02-r{r:03d}-phy" for r in range(13,14)]
       )
 
 # use FCCD values reviewed by Elisabetta
@@ -70,6 +75,8 @@ for run in runlist:
 
     # get parameters and hardware configuration for run
     p = run.split("-")
+    if (p[3] not in lmeta.dataprod.runinfo[p[1]][p[2]]):
+        continue
     tstamp = lmeta.dataprod.runinfo[p[1]][p[2]][p[3]].start_key
     chmap = lmeta.channelmap(tstamp).map("system", unique=False).geds
     hit_pars = par_pht_meta.on(tstamp)
@@ -101,10 +108,16 @@ for run in runlist:
                         print(
                             f"WARNING: no eres params found for {data.analysis.usability} {channel}/{data.name} in {run}"
                         )
-
+            
             # convert to format expected by mage-post-proc
             if pars is not None and all(p >= 0 for p in pars):
                 eres_pars = [round(math.sqrt(x) / 2.355, 6) for x in pars]
+
+                if (len(eres_pars)==2):
+                    eres_pars.append(0)
+            else:
+                eres_pars=[2,0,0]
+
         elif data.analysis.usability not in ("off", "ac"):
             print(
                 f"ERROR: {data.analysis.usability} {channel}/{data.name} not in JSON file"
