@@ -1,0 +1,14 @@
+#!/bin/bash
+
+tag="$1"
+archive="generated/releases/${tag}.tar.xz"
+mkdir -p "$(dirname "$archive")"
+
+tar --create \
+     --xz \
+    --verbose \
+    --file "generated/releases/${tag}.tar.xz" \
+    --transform "s|.*/\(.*-tier_pdf\..*\)|${tag}/\1|g" \
+    "$(find generated/tier/pdf -type f -name "*-tier_pdf.*")"
+
+echo "INFO: $(realpath "$archive") created"
