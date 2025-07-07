@@ -17,7 +17,7 @@
 # works on the LNGS cluster! At the end of this file there's an example of how
 # it should look like
 
-# ruff: noqa: F821, T201
+# ruff: noqa: T201
 
 
 import json

@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-# ruff: noqa: F821, T201, S307
+# ruff: noqa: F821
 
 from __future__ import annotations
 
