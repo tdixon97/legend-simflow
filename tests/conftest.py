@@ -1,19 +1,32 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 import legenddataflowscripts
 import pytest
 import yaml
+from dbetto import AttrsDict, TextDB
 
-testprod = Path(__file__).parent / "test-prod"
+testprod = Path(__file__).parent / "dummyprod"
 config_filename = testprod / "simflow-config.yaml"
 
 
-@pytest.fixture(scope="session")
-def simflow_config():
+def make_config():
     with config_filename.open() as f:
-        return legenddataflowscripts.workflow.utils.subst_vars(
-            yaml.safe_load(f), var_values={"_": str(Path(__file__).parent)}
-        )
+        config = yaml.safe_load(f)
+
+    legenddataflowscripts.subst_vars(config, var_values={"_": testprod})
+    assert config is not None
+
+    metadata = TextDB(testprod / "inputs")
+    config["metadata"] = metadata.simprod.config
+
+    return AttrsDict(config)
+
+
+@pytest.fixture(scope="session")
+def config():
+    return make_config()
 
 
 class mock_workflow_class:
@@ -24,9 +37,3 @@ class mock_workflow_class:
 @pytest.fixture(scope="module")
 def mock_workflow():
     return mock_workflow_class()
-
-
-# @pytest.fixture
-# def mock_os_environ(monkeypatch):
-#     monkeypatch.setenv("PRODENV", "prod")
-#     return os.environ

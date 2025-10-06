@@ -52,7 +52,7 @@ dependencies = [
     "colorlog",
     "pylegendmeta",
     "pip",
-    "legend-dataflow-scripts >=0.1.2",
+    "legend-dataflow-scripts >=0.2.1",
     "dbetto",
     "pyyaml",
 ]

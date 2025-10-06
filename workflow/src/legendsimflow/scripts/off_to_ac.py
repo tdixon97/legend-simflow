@@ -18,7 +18,7 @@
 # it should look like
 
 # ruff: noqa: T201
-
+from __future__ import annotations
 
 import json
 import os

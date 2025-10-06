@@ -2,29 +2,11 @@ simconfigs = aggregate.collect_simconfigs(config, ["ver"])
 for tier, simid, n_macros in simconfigs:
 
     rule:
-        """Generates all needed simulation macros. No wildcards are used."""  # ({n_macros}) for {simid} in tier {tier}"""
-        localrule: True
-        input:
-            **patterns.macro_gen_inputs(config, tier, simid),
-        output:
-            patterns.input_simid_filenames(config, n_macros, tier=tier, simid=simid),
-        params:
-            tier=tier,
-            simid=simid,
-        threads: 1
-        message:
-            f"Generating macros for {tier}.{simid}"
-        script:
-            "scripts/generate_macros.py"
-
-    utils.set_last_rule_name(workflow, f"gen_macros_{simid}-tier_{tier}")
-
-    rule:
         """Produces plots for the primary event vertices of simid {simid} in tier {tier}"""
         input:
             aggregate.gen_list_of_simid_outputs(config, tier, simid, max_files=5),
         output:
-            Path(patterns.plots_file_path(config, tier=tier, simid=simid))
+            Path(patterns.plots_filepath(config, tier=tier, simid=simid))
             / f"mage-event-vertices-tier_{tier}.png",
         priority: 100  # prioritize producing the needed input files over the others
         shell:
@@ -57,8 +39,8 @@ rule build_tier_ver:
     output:
         protected(patterns.output_simjob_filename(config, tier="ver")),
     log:
-        patterns.log_file_path(config, proctime, tier="ver"),
+        patterns.log_filename(config, proctime, tier="ver"),
     benchmark:
-        patterns.benchmark_file_path(config, tier="ver")
+        patterns.benchmark_filename(config, tier="ver")
     shell:
         patterns.run_command(config, "ver")

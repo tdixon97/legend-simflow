@@ -17,6 +17,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from .exceptions import SimflowConfigError
+
 
 def get_some_list(field):
     """Get a list, whether it's in a file or directly specified."""
@@ -30,3 +32,15 @@ def get_some_list(field):
         slist = field
 
     return slist
+
+
+def get_simconfig(config, tier, simid=None, field=None):
+    block = f"metadata/tier/{tier}/{config.experiment}/simconfig/{simid}"
+    try:
+        if simid is None:
+            return config.metadata.tier[tier][config.experiment].simconfig
+        if field is None:
+            return config.metadata.tier[tier][config.experiment].simconfig[simid]
+        return config.metadata.tier[tier][config.experiment].simconfig[simid][field]
+    except (KeyError, FileNotFoundError) as e:
+        raise SimflowConfigError(block, e) from e

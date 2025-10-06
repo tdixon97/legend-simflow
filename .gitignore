@@ -3,6 +3,7 @@
 workflow/src/legendsimflow/_version.py
 .snakemake
 /inputs
+/tests/dummyprod/generated
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

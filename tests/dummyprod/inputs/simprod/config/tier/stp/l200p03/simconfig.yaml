@@ -1,0 +1,29 @@
+l200p03-birds-nest-K40:
+  template: $_/template.mac
+  generator: ~defines:K40
+  confinement: ~defines:birds-nest
+  primaries_per_job: 100_000
+  number_of_jobs: 10
+
+l200p03-pen-plates-Ra224-to-Pb208:
+  template: $_/template.mac
+  generator: ~defines:Ra224-to-Pb208
+  confinement: ~volumes.bulk:pen.*
+  primaries_per_job: 100_000
+  number_of_jobs: 20
+
+l200p03-hpge-bulk-Rn222-to-Po214:
+  template: $_/template.mac
+  generator: ~defines:Rn222-to-Po214
+  confinement: ~defines:hpge-bulk
+  primaries_per_job: 100_000
+  number_of_jobs: 30
+
+l200p03-hpge-surface-K42:
+  template: $_/template.mac
+  generator: ~defines:Ra228-to-Ac228
+  confinement:
+    - ~volumes.surface:V.*
+    - ~volumes.surface:B.*
+  primaries_per_job: 100_000
+  number_of_jobs: 40

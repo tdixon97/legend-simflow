@@ -14,6 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # ruff: noqa: T201
+from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -45,7 +46,13 @@ for file in file_evts:
 # write json file with weights for each run
 with Path(snakemake.output[0]).open("w") as f:
     json.dump(
-        dict(zip(runs, [int(tot_events * t / sum(livetimes)) for t in livetimes])),
+        dict(
+            zip(
+                runs,
+                [int(tot_events * t / sum(livetimes)) for t in livetimes],
+                strict=False,
+            )
+        ),
         f,
         indent=2,
     )

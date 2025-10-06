@@ -29,9 +29,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import yaml
 from dbetto import AttrsDict
 from snakemake.io import expand
+
+from .utils import get_simconfig
 
 FILETYPES = AttrsDict(
     {
@@ -58,15 +59,10 @@ def simjob_rel_basename(**kwargs):
     return expand("{simid}/{simid}_{jobid}", **kwargs, allow_missing=True)[0]
 
 
-def run_command(config, tier):
-    """Returns command to build files in tier `tier` prefixed by environment."""
-    return " ".join(config["execenv"]) + " " + config["runcmd"][tier]
-
-
-def log_file_path(config, time, **kwargs):
+def log_filename(config, time, **kwargs):
     """Formats a log file path for a `simid` and `jobid`."""
     pat = str(
-        Path(config["paths"]["log"])
+        Path(config.paths.log)
         / time
         / "{tier}"
         / (simjob_rel_basename() + "-tier_{tier}.log")
@@ -74,64 +70,27 @@ def log_file_path(config, time, **kwargs):
     return expand(pat, **kwargs, allow_missing=True)[0]
 
 
-def benchmark_file_path(config, **kwargs):
+def benchmark_filename(config, **kwargs):
     """Formats a benchmark file path for a `simid` and `jobid`."""
     pat = str(
-        Path(config["paths"]["benchmarks"])
+        Path(config.paths.benchmarks)
         / "{tier}"
         / (simjob_rel_basename() + "-tier_{tier}.tsv")
     )
     return expand(pat, **kwargs, allow_missing=True)[0]
 
 
-def plots_file_path(config, **kwargs):
+def plots_filepath(config, **kwargs):
     """Formats a benchmark file path for a `simid` and `jobid`."""
-    pat = str(Path(config["paths"]["plots"]) / "{tier}" / "{simid}")
+    pat = str(Path(config.paths.plots) / "{tier}" / "{simid}")
     return expand(pat, **kwargs, allow_missing=True)[0]
-
-
-def genmacro_log_file_path(config, time, **kwargs):
-    """Formats a log file path for a `simid` and `jobid`."""
-    return expand(
-        str(
-            Path(config["paths"]["log"])
-            / time
-            / "macros"
-            / "{tier}"
-            / (simjob_rel_basename() + "-tier_{tier}.log")
-        ),
-        **kwargs,
-        allow_missing=True,
-    )[0]
-
-
-def template_macro_dir(config, **kwargs):
-    """Returns the directory path to the macro templates for the current `tier`."""
-    tier = expand("{tier}", **kwargs, allow_missing=True)[0]
-    return Path(config["paths"]["config"]) / "tier" / tier / config["experiment"]
 
 
 # ver, stp, hit tiers
 
 
-def macro_gen_inputs(config, tier, simid, **kwargs):
-    """Return inputs for the Snakemake rules that generate macros."""
-    tdir = template_macro_dir(config, tier=tier)
-
-    with (tdir / "simconfig.yaml").open() as f:
-        sconfig = yaml.safe_load(f)[simid]
-
-    if "template" not in sconfig:
-        msg = "simconfig.yaml blocks must define a 'template' field."
-        raise RuntimeError(msg)
-
-    expr = {
-        "template": str(tdir / sconfig["template"]),
-        "cfgfile": str(tdir / "simconfig.yaml"),
-    }
-    for k, v in expr.items():
-        expr[k] = expand(v, **kwargs, allow_missing=True)[0]
-    return expr
+def pygeom_filename(config):
+    return Path(config.paths.pygeom) / f"{config['experiment']}-geometry.gdml"
 
 
 def input_simjob_filename(config, **kwargs):
@@ -142,8 +101,8 @@ def input_simjob_filename(config, **kwargs):
         msg = "the 'tier' argument is mandatory"
         raise RuntimeError(msg)
 
-    fname = simjob_rel_basename() + f"-tier_{tier}" + FILETYPES["input"][tier]
-    expr = str(Path(config["paths"]["macros"]) / f"{tier}" / fname)
+    fname = "{simid}" + f"-tier_{tier}" + FILETYPES["input"][tier]
+    expr = str(Path(config.paths.macros) / f"{tier}" / fname)
     return expand(expr, **kwargs, allow_missing=True)[0]
 
 
@@ -156,7 +115,7 @@ def output_simjob_filename(config, **kwargs):
         raise RuntimeError(msg)
 
     fname = simjob_rel_basename() + f"-tier_{tier}" + FILETYPES["output"][tier]
-    expr = str(Path(config["paths"][f"tier_{tier}"]) / fname)
+    expr = str(Path(config.paths[f"tier_{tier}"]) / fname)
     return expand(expr, **kwargs, allow_missing=True)[0]
 
 
@@ -188,18 +147,13 @@ def output_simid_filenames(config, n_macros, **kwargs):
     return expand(pat, jobid=jobids, **kwargs, allow_missing=True)
 
 
-def smk_ver_filename_for_stp(config, wildcards):
+def ver_filename_for_stp(config, simid):
     """Returns the vertices file needed for the 'stp' tier job, if needed. Used
     as lambda function in the `build_tier_stp` Snakemake rule."""
-    tdir = template_macro_dir(config, tier="stp")
-
-    with (tdir / "simconfig.yaml").open() as f:
-        sconfig = yaml.safe_load(f)[wildcards.simid]
-
+    sconfig = get_simconfig(config, "stp", simid)
     if "vertices" in sconfig:
-        return output_simjob_filename(config, tier="ver", simid=sconfig["vertices"])
-    else:
-        return []
+        return output_simjob_filename(config, tier="ver", simid=sconfig.vertices)
+    return []
 
 
 # evt tier
@@ -236,10 +190,6 @@ def benchmark_evtfile_path(config, **kwargs):
 
 def pdffile_rel_basename(**kwargs):
     return expand("{simid}/{simid}-tier_pdf", **kwargs, allow_missing=True)[0]
-
-
-def pdf_config_path(config):
-    return template_macro_dir(config, tier="pdf") / "build-pdf-config.yaml"
 
 
 def output_pdf_filename(config, **kwargs):

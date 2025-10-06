@@ -1,4 +1,3 @@
-
 rule gen_all_tier_hit:
     """Aggregate and produce all the hit tier files."""
     input:
@@ -19,8 +18,8 @@ rule build_tier_hit:
     params:
         ro_stp_file=lambda wildcards, input: utils.as_ro(config, input.stp_file),
     log:
-        patterns.log_file_path(config, proctime, tier="hit"),
+        patterns.log_filepath(config, proctime, tier="hit"),
     benchmark:
-        patterns.benchmark_file_path(config, tier="hit")
+        patterns.benchmark_filename(config, tier="hit")
     shell:
         patterns.run_command(config, "hit")
