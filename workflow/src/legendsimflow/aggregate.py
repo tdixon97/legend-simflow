@@ -15,59 +15,49 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
-import yaml
-from dbetto import Props
-
 from . import patterns, utils
+from .utils import get_simconfig
 
 
-def get_simid_n_macros(config, tier, simid):
+def get_simid_njobs(config, tier, simid):
     """Returns the number of macros that will be generated for a given `tier`
     and `simid`."""
     if tier not in ("ver", "stp"):
         tier = "stp"
 
-    if "benchmark" in config and config["benchmark"].get("enabled", False):
+    if "benchmark" in config and config.benchmark.get("enabled", False):
         return 1
 
-    tdir = patterns.template_macro_dir(config, tier=tier)
-
-    with (Path(tdir) / "simconfig.yaml").open() as f:
-        sconfig = yaml.safe_load(f)[simid]
+    sconfig = get_simconfig(config, tier, simid=simid)
 
     if "vertices" in sconfig and "number_of_jobs" not in sconfig:
-        return len(gen_list_of_simid_outputs(config, "ver", sconfig["vertices"]))
-    elif "number_of_jobs" in sconfig:
-        return sconfig["number_of_jobs"]
-    else:
-        msg = "simulation config must contain 'vertices' or 'number_of_jobs'"
-        raise RuntimeError(msg)
+        return len(gen_list_of_simid_outputs(config, "ver", sconfig.vertices))
+    if "number_of_jobs" in sconfig:
+        return sconfig.number_of_jobs
+    return get_simconfig(config, tier, simid=simid, field="number_of_jobs")
 
 
 def gen_list_of_simid_inputs(config, tier, simid):
     """Generates the full list of input files for a `tier` and `simid`."""
-    n_macros = get_simid_n_macros(config, tier, simid)
-    return patterns.input_simid_filenames(config, n_macros, tier=tier, simid=simid)
+    n_jobs = get_simid_njobs(config, tier, simid)
+    return patterns.input_simid_filenames(config, n_jobs, tier=tier, simid=simid)
 
 
 def gen_list_of_simid_outputs(config, tier, simid, max_files=None):
     """Generates the full list of output files for a `simid`."""
-    n_macros = get_simid_n_macros(config, tier, simid)
+    n_jobs = get_simid_njobs(config, tier, simid)
     if max_files is not None:
-        n_macros = min(n_macros, max_files)
-    return patterns.output_simid_filenames(config, n_macros, tier=tier, simid=simid)
+        n_jobs = min(n_jobs, max_files)
+    return patterns.output_simid_filenames(config, n_jobs, tier=tier, simid=simid)
 
 
 def gen_list_of_plots_outputs(config, tier, simid):
     if tier == "stp":
         return [
-            patterns.plots_file_path(config, tier=tier, simid=simid)
+            patterns.plots_filepath(config, tier=tier, simid=simid)
             + "/event-vertices-tier_stp.png"
         ]
-    else:
-        return []
+    return []
 
 
 # simid independent stuff
@@ -76,10 +66,8 @@ def gen_list_of_plots_outputs(config, tier, simid):
 def collect_simconfigs(config, tiers):
     cfgs = []
     for tier in tiers:
-        for sid, _val in Props.read_from(
-            patterns.template_macro_dir(config, tier=tier) / "simconfig.yaml"
-        ).items():
-            cfgs.append((tier, sid, get_simid_n_macros(config, tier, sid)))
+        for sid, _val in get_simconfig(config, tier).items():
+            cfgs.append((tier, sid, get_simid_njobs(config, tier, sid)))
 
     return cfgs
 
@@ -87,17 +75,7 @@ def collect_simconfigs(config, tiers):
 def gen_list_of_all_simids(config, tier):
     if tier not in ("ver", "stp"):
         tier = "stp"
-    return Props.read_from(
-        patterns.template_macro_dir(config, tier=tier) / "simconfig.yaml"
-    ).keys()
-
-
-def gen_list_of_all_macros(config, tier):
-    mlist = []
-    for simid in gen_list_of_all_simids(config, tier):
-        mlist += gen_list_of_simid_inputs(config, tier, simid)
-
-    return mlist
+    return get_simconfig(config, tier).keys()
 
 
 def gen_list_of_all_simid_outputs(config, tier):
@@ -121,7 +99,7 @@ def gen_list_of_all_plots_outputs(config, tier):
 
 
 def gen_list_of_tier_evt_outputs(config, simid):
-    runlist = utils.get_some_list(config["runlist"])
+    runlist = utils.get_some_list(config.runlist)
 
     mlist = []
     for runid in runlist:
@@ -156,7 +134,7 @@ def gen_list_of_all_tier_pdf_outputs(config):
 
 def process_simlist(config, simlist=None):
     if simlist is None:
-        simlist = utils.get_some_list(config["simlist"])
+        simlist = utils.get_some_list(config.simlist)
 
     # if it's a list, every item is a simid
     # otherwise, interpret as comma-separated list
@@ -169,7 +147,7 @@ def process_simlist(config, simlist=None):
         tier = line.split(".")[0].strip()
         simid = line.split(".")[1].strip()
 
-        mlist += gen_list_of_plots_outputs(config, tier, simid)
+        # mlist += gen_list_of_plots_outputs(config, tier, simid)
         if tier in ("ver", "stp", "hit"):
             mlist += gen_list_of_simid_outputs(config, tier, simid)
         elif tier == "evt":

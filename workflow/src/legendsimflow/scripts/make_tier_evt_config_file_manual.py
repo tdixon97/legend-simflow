@@ -18,7 +18,7 @@
 # it should look like
 
 # ruff: noqa: T201
-
+from __future__ import annotations
 
 import json
 import math
@@ -94,7 +94,7 @@ for run in runlist:
         evt_cfg[mage_id] = {
             "name": data.name,
             "nplus-fccd-mm": fccd[data.name],
-            "energy": dict(zip(["sig0", "sig1", "sig2"], eres_pars)),
+            "energy": dict(zip(["sig0", "sig1", "sig2"], eres_pars, strict=False)),
             "usability": data.analysis.usability,
         }
 

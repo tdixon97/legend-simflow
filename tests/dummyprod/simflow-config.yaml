@@ -1,18 +1,4 @@
 experiment: l200p03
-# runlist:
-# - l200-p03-r000-phy
-# - l200-p03-r001-phy
-# - l200-p03-r002-phy
-# - l200-p03-r005-phy
-# - l200-p04-r000-phy
-# - l200-p04-r001-phy
-
-simlist: all
-
-# make_tiers:
-# - stp
-
-# legend_metadata_version: main
 
 benchmark:
   enabled: false
@@ -41,11 +27,3 @@ paths:
   tier_ver: ./generated/tier/ver
   pdf_releases: $_/generated/releases
   plots: $_/generated/plots
-
-# precompile_pkg:
-#   - lgdo
-#   - matplotlib
-#   - reboost
-#   - legendhpges
-#   - legendoptics
-#   - pygeomtools

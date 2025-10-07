@@ -148,7 +148,9 @@ def get_string_row_diff(channel_array, channel2string, channel2position):
     string_two = channel2string(channel_two)
     string_diff_1 = (string_one - string_two) % 11
     string_diff_2 = (-string_one + string_two) % 11
-    string_diff = np.array([min(a, b) for a, b in zip(string_diff_1, string_diff_2)])
+    string_diff = np.array(
+        [min(a, b) for a, b in zip(string_diff_1, string_diff_2, strict=False)]
+    )
 
     position_one = channel2position(channel_one)
     position_two = channel2position(channel_two)
@@ -216,7 +218,7 @@ def build_pdf() -> None:
     geds_mapping = {
         f"ch{_dict['daq']['rawid']}": _name
         for _name, _dict in chmap.items()
-        if chmap[_name]["system"] == "geds"
+        if _dict["system"] == "geds"
     }
     # geds_strings = {
     #     f"ch{_dict['daq']['rawid']}": _dict["location"]["string"]
@@ -288,9 +290,9 @@ def build_pdf() -> None:
     sum_hists = {}
     hists_2d = {}
 
-    ## categories for m2
+    # categories for m2
     string_diff = np.arange(7)
-    floor_diff = np.arange(8)
+    _ = np.arange(8)
     names_m2 = [f"sd_{item1}" for item1 in string_diff]
     names_m2.extend(["all", "cat_1", "cat_2", "cat_3"])
     names_m2.extend(["e1_icpc", "e1_bege", "e1_ppc", "e1_coax"])
@@ -479,7 +481,7 @@ def build_pdf() -> None:
                                     channel_to_string,
                                     channel_to_position,
                                 )
-                                string_diff, floor_diff = get_string_row_diff(
+                                string_diff, _ = get_string_row_diff(
                                     _mult_channel_array,
                                     channel_to_string,
                                     channel_to_position,
@@ -571,9 +573,7 @@ def build_pdf() -> None:
                 rconfig["hist"]["emax"],
             )
         for _rawid, _name in geds_mapping.items():
-            hists[_cut_name][chmap[geds_mapping[_rawid]]["type"]].Add(
-                hists[_cut_name][_rawid]
-            )
+            hists[_cut_name][chmap[_name]["type"]].Add(hists[_cut_name][_rawid])
             hists[_cut_name]["all"].Add(hists[_cut_name][_rawid])
 
     # write the hists to file (but only if they have none zero entries)

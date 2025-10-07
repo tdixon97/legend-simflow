@@ -14,6 +14,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # ruff: noqa: T201
+from __future__ import annotations
 
 import csv
 import json
