@@ -52,9 +52,9 @@ def remage_run(config, simid, tier="stp", macro_free=False):
         "--merge-output-files",
         "--log-level=detail",
         "--threads",
-        "1",
+        "{threads}",
         "--gdml-files",
-        str(patterns.pygeom_filename(config)),
+        "{input.geom}",
         "--output-file",
         str(patterns.output_simjob_filename(config, tier=tier, simid=simid)),
     ]

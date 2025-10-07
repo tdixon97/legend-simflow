@@ -19,7 +19,7 @@ paths:
 
   genconfig: $_/generated/config
   macros: $_/generated/macros
-  pygeom: $_/generated/pygeom
+  geom: $_/generated/geom
   tier_evt: $_/generated/tier/evt
   tier_hit: ./generated/tier/hit
   tier_pdf: $_/generated/tier/pdf

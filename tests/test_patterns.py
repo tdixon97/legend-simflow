@@ -10,7 +10,7 @@ def test_all(config):
     assert isinstance(p.log_filename(config, "now"), str)
     assert isinstance(p.plots_filepath(config), str)
     assert isinstance(p.benchmark_filename(config), str)
-    assert isinstance(p.pygeom_filename(config), Path)
+    assert isinstance(p.geom_filename(config), Path)
     assert isinstance(p.input_simjob_filename(config, tier="stp"), str)
     assert isinstance(p.output_simjob_filename(config, tier="stp"), str)
     assert isinstance(p.output_simjob_regex(config, tier="stp"), str)

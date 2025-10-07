@@ -8,6 +8,19 @@ rule gen_all_tier_stp:
         aggregate.gen_list_of_all_simid_outputs(config, tier="stp"),
 
 
+rule build_geom_gdml:
+    message:
+        ""
+    input:
+        patterns.geom_config(config),
+    output:
+        patterns.geom_filename(config),
+    log:
+        patterns.geom_log_filename(config, proctime),
+    shell:
+        "legend-pygeom-l200 --config {input} -- {output} &> {log}"
+
+
 # since the number of jobs for the 'output' field must be deduced at runtime
 # from the configuration, we need here to generate a separate rule for each
 # 'simid'
@@ -22,12 +35,14 @@ for tier, simid, n_jobs in simconfigs:
             "Producing output file for job stp.{simid}.{wildcards.jobid}"
         input:
             verfile=patterns.ver_filename_for_stp(config, simid),
+            geom=rules.build_geom_gdml.output,
         output:
             protected(patterns.output_simjob_filename(config, tier="stp", simid=simid)),
         log:
             patterns.log_filename(config, proctime, tier="stp", simid=simid),
         benchmark:
             patterns.benchmark_filename(config, tier="stp", simid=simid)
+        threads: 1
         shell:
             commands.remage_run(config, simid, tier="stp", macro_free=True)
 
