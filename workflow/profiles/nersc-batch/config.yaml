@@ -47,4 +47,4 @@ groups:
 # disconnected parts of the workflow can run in parallel (at most 256 of them)
 # in a group
 group-components:
-    - sims=256
+  - sims=256

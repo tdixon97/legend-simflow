@@ -25,6 +25,7 @@ Definitions:
 - ``simjob``: one job of a simulation run (corresponds to one macro file and one output file)
 - ``jobid``: zero-padded integer (i.e., a string) used to label a simulation job
 """
+
 from __future__ import annotations
 
 from pathlib import Path

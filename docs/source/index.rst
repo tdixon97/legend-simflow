@@ -1,8 +1,8 @@
 legend-simflow
 ===============
 
-*legend-simflow* is a Python package based on Snakemake
-`<https://snakemake.readthedocs.io/en/stable/index.html>`_ for running the
+*legend-simflow* is a Python package based on `Snakemake
+<https://snakemake.readthedocs.io/en/stable/index.html>`_ for running the
 simulation production workflow for the LEGEND experiment.
 
 Next steps
