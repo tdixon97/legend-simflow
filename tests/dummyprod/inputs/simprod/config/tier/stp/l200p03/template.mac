@@ -11,6 +11,9 @@
 
 /run/initialize
 
+/RMG/Geometry/PrintListOfLogicalVolumes
+/RMG/Geometry/PrintListOfPhysicalVolumes
+
 # discard events without Germanium energy
 /RMG/Output/Germanium/EdepCutLow 0
 

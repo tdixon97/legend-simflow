@@ -46,5 +46,5 @@ mini-shroud:
 
 mini-shroud-surface:
   - /RMG/Generator/Confine Volume
-  - /RMG/Generator/Confine/SampleOnSurface True
+  - /RMG/Generator/Confinement/SampleOnSurface True
   - /RMG/Generator/Confinement/Physical/AddVolume minishroud.*

@@ -227,7 +227,7 @@ def make_remage_macro(config: Mapping, simid: str, tier: str = "stp") -> (str, P
                     + sim_cfg.confinement.partition(":")[2],
                 ]
                 if sim_cfg.confinement.startswith("~volumes.surface:"):
-                    confinement += ["/RMG/Generator/Confine/SampleOnSurface true"]
+                    confinement += ["/RMG/Generator/Confinement/SampleOnSurface true"]
             else:
                 confinement = None
 
@@ -240,7 +240,9 @@ def make_remage_macro(config: Mapping, simid: str, tier: str = "stp") -> (str, P
                         + val.partition(":")[2]
                     ]
                     if val.startswith("~volumes.surface:"):
-                        confinement += ["/RMG/Generator/Confine/SampleOnSurface true"]
+                        confinement += [
+                            "/RMG/Generator/Confinement/SampleOnSurface true"
+                        ]
                 else:
                     confinement = None
 

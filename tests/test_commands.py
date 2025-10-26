@@ -34,14 +34,16 @@ def test_make_macro(config):
         "/RMG/Generator/Confinement/Physical/AddVolume pen.*",
     ]
     assert set(confine).issubset(text.split("\n"))
-    assert "/RMG/Generator/Confine/SampleOnSurface" not in text
+    assert "/RMG/Generator/Confinement/SampleOnSurface" not in text
 
-    text, fmac = commands.make_remage_macro(config, "l200p03-hpge-surface-K42", "stp")
+    text, fmac = commands.make_remage_macro(
+        config, "l200p03-phbr-surface-Ra228-to-Ac228", "stp"
+    )
     confine = [
         "/RMG/Generator/Confine Volume",
-        "/RMG/Generator/Confinement/Physical/AddVolume V.*",
-        "/RMG/Generator/Confinement/Physical/AddVolume B.*",
-        "/RMG/Generator/Confine/SampleOnSurface true",
+        "/RMG/Generator/Confinement/Physical/AddVolume phbr_spring.*",
+        "/RMG/Generator/Confinement/Physical/AddVolume phbr_washer.*",
+        "/RMG/Generator/Confinement/SampleOnSurface true",
     ]
     assert set(confine).issubset(text.split("\n"))
 

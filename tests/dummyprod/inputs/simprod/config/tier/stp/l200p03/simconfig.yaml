@@ -19,12 +19,12 @@ l200p03-hpge-bulk-Rn222-to-Po214:
   primaries_per_job: 10_000
   number_of_jobs: 4
 
-l200p03-hpge-surface-K42:
+l200p03-phbr-surface-Ra228-to-Ac228:
   template: $_/template.mac
   generator: ~defines:Ra228-to-Ac228
   confinement:
-    - ~volumes.surface:V.*
-    - ~volumes.surface:B.*
+    - ~volumes.surface:phbr_spring.*
+    - ~volumes.surface:phbr_washer.*
   primaries_per_job: 10_000
   number_of_jobs: 5
 
