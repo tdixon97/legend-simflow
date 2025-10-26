@@ -11,8 +11,17 @@ from .exceptions import SimflowConfigError
 from .utils import get_simconfig
 
 
-def remage_run(config, simid, tier="stp", macro_free=False):
+def remage_run(
+    config,
+    simid,
+    tier="stp",
+    geom="{input.geom}",
+    threads="{threads}",
+    output="{output}",
+    macro_free=False,
+):
     """remage command line for Snakemake rules."""
+
     # get the config block for this tier/simid
     block = f"metadata.tier.{tier}.{config.experiment}.simconfig.{simid}"
     sim_cfg = get_simconfig(config, tier, simid=simid)
@@ -52,11 +61,11 @@ def remage_run(config, simid, tier="stp", macro_free=False):
         "--merge-output-files",
         "--log-level=detail",
         "--threads",
-        "{threads}",
+        str(threads),
         "--gdml-files",
-        "{input.geom}",
+        str(geom),
         "--output-file",
-        str(patterns.output_simjob_filename(config, tier=tier, simid=simid)),
+        str(output),
     ]
 
     if macro_free:
@@ -77,13 +86,12 @@ def remage_run(config, simid, tier="stp", macro_free=False):
 
         cmd += ["--"]
 
-        # NOTE: macro file path contains unexpanded wildcards!
-        cmd += [patterns.input_simjob_filename(config, tier=tier)]
+        cmd += [patterns.input_simjob_filename(config, tier=tier, simid=simid)]
 
     return shlex.join(cmd)
 
 
-def make_remage_macro(config, simid, tier="stp"):
+def make_remage_macro(config, simid, tier="stp") -> (str, Path):
     # get the config block for this tier/simid
     block = f"metadata.tier.{tier}.{config.experiment}.simconfig.{simid}"
     sim_cfg = get_simconfig(config, tier, simid=simid)

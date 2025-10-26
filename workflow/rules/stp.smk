@@ -16,7 +16,7 @@ rule gen_geom_config:
     add extra configuration options in case requested in simconfig.yaml.
     """
     message:
-        "Generating geometry configuration for {tier}.{simid}"
+        "Generating geometry configuration for {wildcards.tier}.{wildcards.simid}"
     input:
         Path(config.paths.config) / "geom" / (config.experiment + "-geom-config.yaml"),
     output:
@@ -35,7 +35,7 @@ rule gen_geom_config:
 
 rule build_geom_gdml:
     message:
-        "Building GDML geometry for {tier}.{simid}"
+        "Building GDML geometry for {wildcards.tier}.{wildcards.simid}"
     input:
         patterns.geom_config(config),
     output:
@@ -47,45 +47,52 @@ rule build_geom_gdml:
         "legend-pygeom-l200 --verbose --config {input} -- {output} &> {log}"
 
 
-# since the number of jobs for the 'output' field must be deduced at runtime
-# from the configuration, we need here to generate a separate rule for each
-# 'simid'
-simconfigs = aggregate.collect_simconfigs(config, ["stp"])
-for _, simid in simconfigs:
+def smk_remage_run(wildcards, input, output, threads):
+    return commands.remage_run(
+        config,
+        wildcards.simid,
+        tier="stp",
+        geom=input.geom,
+        output=output,
+        threads=threads,
+        macro_free=True,
+    )
 
-    rule:
-        """Run a single simulation job for the stp tier.
-        Uses wildcards {simid} and `jobid`.
-        """
-        message:
-            "Producing output file for job stp.{simid}.{wildcards.jobid}"
-        input:
-            verfile=patterns.ver_filename_for_stp(config, simid),
-            geom=patterns.geom_gdml_filename(config, tier="stp", simid=simid),
-        output:
-            protected(patterns.output_simjob_filename(config, tier="stp", simid=simid)),
-        log:
-            patterns.log_filename(config, proctime, tier="stp", simid=simid),
-        benchmark:
-            patterns.benchmark_filename(config, tier="stp", simid=simid)
-        threads: 1
-        shell:
-            commands.remage_run(config, simid, tier="stp", macro_free=True)
 
-    ldfs.workflow.utils.set_last_rule_name(workflow, f"build_tier_stp_{simid}")
-    # rule:
-    #     """Produces plots for the primary event vertices of simid {simid} in tier {tier}"""
-    #     input:
-    #         aggregate.gen_list_of_simid_outputs(config, tier, simid, max_files=5),
-    #     output:
-    #         Path(patterns.plots_filepath(config, tier=tier, simid=simid))
-    #         / f"mage-event-vertices-tier_{tier}.png",
-    #     priority: 100  # prioritize producing the needed input files over the others
-    #     shell:
-    #         (
-    #             " ".join(config["execenv"])
-    #             + " python "
-    #             + workflow.source_path("../scripts/plot_mage_vertices.py")
-    #             + " -b -o {output} {input}"
-    #         )
-    # ldfs.workflow.utils.set_last_rule_name(workflow, f"plot_prim_vert_{simid}-tier_{tier}")
+rule build_tier_stp:
+    """Run a single simulation job for the stp tier, simulation id {simid}.
+    Uses wildcard `jobid`."""
+    message:
+        "Producing output file for job stp.{wildcards.simid}.{wildcards.jobid}"
+    input:
+        # verfile=patterns.ver_filename_for_stp(config, sid),
+        geom=patterns.geom_gdml_filename(config, tier="stp"),
+    output:
+        protected(patterns.output_simjob_filename(config, tier="stp")),
+    log:
+        patterns.log_filename(config, proctime, tier="stp"),
+    benchmark:
+        patterns.benchmark_filename(config, tier="stp")
+    threads: 1
+    params:
+        cmd=smk_remage_run,
+    shell:
+        "{params.cmd} &> {log}"
+
+
+# rule:
+#     """Produces plots for the primary event vertices of simid {simid} in tier {tier}"""
+#     input:
+#         aggregate.gen_list_of_simid_outputs(config, tier, simid, max_files=5),
+#     output:
+#         Path(patterns.plots_filepath(config, tier=tier, simid=simid))
+#         / f"mage-event-vertices-tier_{tier}.png",
+#     priority: 100  # prioritize producing the needed input files over the others
+#     shell:
+#         (
+#             " ".join(config["execenv"])
+#             + " python "
+#             + workflow.source_path("../scripts/plot_mage_vertices.py")
+#             + " -b -o {output} {input}"
+#         )
+# ldfs.workflow.utils.set_last_rule_name(workflow, f"plot_prim_vert_{simid}-tier_{tier}")

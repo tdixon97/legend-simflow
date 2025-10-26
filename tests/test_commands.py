@@ -92,7 +92,9 @@ def test_remage_cli(config):
     cmd = commands.remage_run(config, "l200p03-birds-nest-K40", "stp")
     assert isinstance(cmd, str)
     assert len(cmd) > 0
-    assert shlex.split(cmd)[-1] == patterns.input_simjob_filename(config, tier="stp")
+    assert shlex.split(cmd)[-1] == patterns.input_simjob_filename(
+        config, tier="stp", simid="l200p03-birds-nest-K40"
+    )
 
     cmd = commands.remage_run(config, "l200p03-birds-nest-K40", "stp", macro_free=True)
     mac_cmds = shlex.split(cmd.partition(" -- ")[2])
