@@ -53,7 +53,7 @@ dependencies = [
     "pylegendmeta",
     "pip",
     "legend-dataflow-scripts >=0.2.1",
-    "dbetto",
+    "dbetto >=1.3",
     "pyyaml",
 ]
 

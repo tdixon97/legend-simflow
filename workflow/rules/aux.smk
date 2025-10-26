@@ -36,6 +36,8 @@ if any([t in make_tiers for t in ("ver", "stp")]):
         """Reports any warning from the simulation job logs."""
         localrule: True
         params:
-            logdir=utils.as_ro(config, Path(config["paths"]["log"]) / proctime),
+            logdir=ldfs.workflow.utils.as_ro(
+                config, Path(config["paths"]["log"]) / proctime
+            ),
         script:
             "../scripts/inspect_MaGe_logs.sh"
