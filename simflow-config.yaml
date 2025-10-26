@@ -41,7 +41,6 @@ paths:
   tier_ver: ./generated/tier/ver
   pdf_releases: $_/generated/releases
   plots: $_/generated/plots
-
 # precompile_pkg:
 #   - lgdo
 #   - matplotlib
