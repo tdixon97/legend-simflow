@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shlex
+from collections.abc import Mapping
 from pathlib import Path
 
 import legenddataflowscripts as lds
@@ -12,15 +13,58 @@ from .utils import get_simconfig
 
 
 def remage_run(
-    config,
-    simid,
-    tier="stp",
-    geom="{input.geom}",
-    threads="{threads}",
-    output="{output}",
-    macro_free=False,
-):
-    """remage command line for Snakemake rules."""
+    config: Mapping,
+    simid: str,
+    tier: str = "stp",
+    geom: str | Path = "{input.geom}",
+    threads: str | int = "{threads}",
+    output: str | Path = "{output}",
+    macro_free: bool = False,
+) -> str:
+    """Build a remage CLI invocation string for a given simulation.
+
+    This constructs a shell-escaped command line for remage by first rendering
+    the macro via :func:`make_remage_macro` using the simulation configuration
+    (from ``simconfig.yaml``), and then assembling the remage CLI with the
+    appropriate arguments and macro handling.
+
+    Notes
+    -----
+    - Compatible with remage >= v0.15.2.
+    - When ``macro_free`` is False (default), the command passes the macro file
+      path and supplies macro substitutions via ``--macro-substitutions``.
+    - When ``macro_free`` is True, the rendered macro content is inlined on the
+      CLI (comments and empty lines removed) and values are pre-substituted.
+    - Two substitutions are always provided:
+      ``N_EVENTS`` (from ``primaries_per_job`` or benchmark override) and
+      ``SEED`` (a random 32-bit integer).
+    - If ``config.runcmd.remage`` is set, it is used to determine the remage
+      executable (split with :func:`shlex.split`), otherwise ``remage`` is used.
+
+    Parameters
+    ----------
+    config
+        Snakemake-like configuration mapping. Must include metadata required by
+        :func:`make_remage_macro` and optional ``benchmark`` and ``runcmd``
+        sections.
+    simid
+        Simulation identifier for which to construct the command.
+    tier
+        Simulation tier (e.g., ``"stp"``, ``"ver"``). Default is ``"stp"``.
+    geom
+        Path (or Snakemake placeholder) to the GDML geometry file.
+    threads
+        Number of threads to pass to remage (int or Snakemake placeholder).
+    output
+        Path (or Snakemake placeholder) to the output remage file.
+    macro_free
+        If True, inline the macro contents on the CLI; if False, reference the
+        macro file and pass substitutions via ``--macro-substitutions``.
+
+    Returns
+    -------
+    A shell-escaped command line suitable for direct execution.
+    """
 
     # get the config block for this tier/simid
     block = f"metadata.tier.{tier}.{config.experiment}.simconfig.{simid}"
@@ -58,6 +102,7 @@ def remage_run(
 
     cmd = [
         *remage_exe,
+        "--ignore-warnings",
         "--merge-output-files",
         "--log-level=detail",
         "--threads",
@@ -91,7 +136,43 @@ def remage_run(
     return shlex.join(cmd)
 
 
-def make_remage_macro(config, simid, tier="stp") -> (str, Path):
+def make_remage_macro(config: Mapping, simid: str, tier: str = "stp") -> (str, Path):
+    """Render the remage macro for a given simulation and write it to disk.
+
+    This function reads the simulation configuration for the provided tier/simid,
+    assembles the macro substitutions (e.g. ``GENERATOR``, ``CONFINEMENT``)
+    using values and references defined under config.metadata, renders the
+    specified macro template, writes the final macro file to the canonical
+    input path, and returns both the macro text and the output file path.
+
+    Parameters
+    ----------
+    config
+        Mapping-like Snakemake configuration that supports attribute-style access
+        (e.g. ``config.experiment``, ``config.metadata``, etc.). The following fields
+        are used:
+        - ``experiment``: name of the experiment to select tier-specific metadata.
+        - ``metadata.tier[tier][experiment].generators``: generator definitions.
+        - ``metadata.tier[tier][experiment].confinement``: confinement definitions.
+    simid
+        Simulation identifier to select the simconfig.
+    tier
+        Simulation tier (e.g. "stp", "ver", ...). Default is "stp".
+
+    Returns
+    -------
+    A tuple with:
+    - The rendered macro text.
+    - The path where the macro was written.
+
+    Notes
+    -----
+    - The macro template path is taken from the simconfig `template` field.
+    - Supported substitutions currently include: ``GENERATOR`` and
+      ``CONFINEMENT``.
+    - The macro is written to the canonical path returned by
+      :func:`.patterns.input_simjob_filename`.
+    """
     # get the config block for this tier/simid
     block = f"metadata.tier.{tier}.{config.experiment}.simconfig.{simid}"
     sim_cfg = get_simconfig(config, tier, simid=simid)

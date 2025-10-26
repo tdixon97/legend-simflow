@@ -1,4 +1,5 @@
 experiment: l200p03
+
 # runlist:
 # - l200-p03-r000-phy
 # - l200-p03-r001-phy
@@ -41,6 +42,7 @@ paths:
   tier_ver: ./generated/tier/ver
   pdf_releases: $_/generated/releases
   plots: $_/generated/plots
+#
 # precompile_pkg:
 #   - lgdo
 #   - matplotlib
@@ -48,3 +50,6 @@ paths:
 #   - legendhpges
 #   - legendoptics
 #   - pygeomtools
+#
+# runcmd:
+#   remage: apptainer run --cleanenv /home/gipert/sw/apptainer/remage_latest.sif

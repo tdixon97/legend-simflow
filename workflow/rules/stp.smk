@@ -1,9 +1,11 @@
-from legendsimflow import aggregate, commands, utils
-from dbetto import utils as dbetto_utils
+"""Rules to build the `stp` tier.
+"""
+
+from legendsimflow import aggregate, commands
 
 
 rule gen_all_tier_stp:
-    """Aggregate and produce all the stp tier files."""
+    """Build the entire `stp` tier."""
     input:
         # aggregate.gen_list_of_all_plots_outputs(config, tier="stp"),
         aggregate.gen_list_of_all_simid_outputs(config, tier="stp"),
@@ -13,7 +15,8 @@ rule gen_geom_config:
     """Write a geometry configuration file for legend-pygeom-l200.
 
     Start from the template/default geometry configuration file and eventually
-    add extra configuration options in case requested in simconfig.yaml.
+    add extra configuration options in case requested in `simconfig.yaml`
+    through the `geom_config_extra` field.
     """
     message:
         "Generating geometry configuration for {wildcards.tier}.{wildcards.simid}"
@@ -22,6 +25,8 @@ rule gen_geom_config:
     output:
         patterns.geom_config(config),
     run:
+        from dbetto import utils as dbetto_utils
+
         gconfig = dbetto_utils.load_dict(input[0])
         sconfig = utils.get_simconfig(
             config, tier=wildcards.tier, simid=wildcards.simid
@@ -34,6 +39,7 @@ rule gen_geom_config:
 
 
 rule build_geom_gdml:
+    """Build a concrete geometry GDML file with {mod}`legend-pygeom-l200`."""
     message:
         "Building GDML geometry for {wildcards.tier}.{wildcards.simid}"
     input:
@@ -48,6 +54,7 @@ rule build_geom_gdml:
 
 
 def smk_remage_run(wildcards, input, output, threads):
+    """Generate the remage command line for use in Snakemake rules."""
     return commands.remage_run(
         config,
         wildcards.simid,
@@ -60,8 +67,15 @@ def smk_remage_run(wildcards, input, output, threads):
 
 
 rule build_tier_stp:
-    """Run a single simulation job for the stp tier, simulation id {simid}.
-    Uses wildcard `jobid`."""
+    """Run a single simulation job for the `stp` tier.
+
+    Uses wildcards `simid` and `jobid`.
+
+    :::{note}
+    The output remage file is declared as `protected` to avoid accidental
+    deletions, since it typically takes a lot of resources to produce it.
+    :::
+    """
     message:
         "Producing output file for job stp.{wildcards.simid}.{wildcards.jobid}"
     input:
