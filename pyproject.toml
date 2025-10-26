@@ -69,10 +69,6 @@ test = [
     "pytest>=6",
     "pytest-cov>=3",
 ]
-dev = [
-    "legend_simflow[runprod,test]",
-    "pre-commit",
-]
 docs = [
     "sphinx>=7.0",
     "myst_parser>=0.13",
@@ -80,6 +76,10 @@ docs = [
     "sphinx_copybutton",
     "sphinx_autodoc_typehints",
     "furo>=2023.08.17",
+]
+all = [
+    "legend_simflow[runprod,test,docs]",
+    "pre-commit",
 ]
 
 [tool.uv.workspace]
