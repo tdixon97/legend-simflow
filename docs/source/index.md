@@ -10,6 +10,7 @@ the simulation production workflow for the LEGEND experiment.
 :maxdepth: 1
 
 Package API reference <api/modules>
+Snakemake rules <api/snakemake_rules>
 ```
 
 ```{toctree}
