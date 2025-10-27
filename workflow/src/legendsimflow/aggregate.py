@@ -66,8 +66,8 @@ def gen_list_of_plots_outputs(config, tier, simid):
 def collect_simconfigs(config, tiers):
     cfgs = []
     for tier in tiers:
-        for sid, _val in get_simconfig(config, tier).items():
-            cfgs.append((tier, sid, get_simid_njobs(config, tier, sid)))
+        for sid in get_simconfig(config, tier):
+            cfgs.append((tier, sid))
 
     return cfgs
 
@@ -75,6 +75,7 @@ def collect_simconfigs(config, tiers):
 def gen_list_of_all_simids(config, tier):
     if tier not in ("ver", "stp"):
         tier = "stp"
+
     return get_simconfig(config, tier).keys()
 
 

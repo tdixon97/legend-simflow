@@ -15,12 +15,17 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
+
+from dbetto import AttrsDict
+from snakemake.io import Wildcards
 
 from .exceptions import SimflowConfigError
 
 
-def get_some_list(field):
+def get_some_list(field: str | list) -> list:
     """Get a list, whether it's in a file or directly specified."""
     if isinstance(field, str):
         if Path(field).is_file():
@@ -34,7 +39,24 @@ def get_some_list(field):
     return slist
 
 
-def get_simconfig(config, tier, simid=None, field=None):
+def get_simconfig(
+    config: AttrsDict, tier: str, simid: str | None = None, field: str | None = None
+) -> AttrsDict:
+    """Get the simulation configuration.
+
+    Gets the simconfig and throws proper exceptions.
+
+    Parameters
+    ----------
+    config
+        Snakemake config.
+    tier
+        tier name.
+    simid
+        simulation identifier.
+    field
+        if not none, return the value of this key in the simconfig.
+    """
     block = f"metadata/tier/{tier}/{config.experiment}/simconfig/{simid}"
     try:
         if simid is None:
@@ -44,3 +66,53 @@ def get_simconfig(config, tier, simid=None, field=None):
         return config.metadata.tier[tier][config.experiment].simconfig[simid][field]
     except (KeyError, FileNotFoundError) as e:
         raise SimflowConfigError(block, e) from e
+
+
+def hash_dict(d):
+    """Compute the hash of a Python dict."""
+    if isinstance(d, AttrsDict):
+        d = d.to_dict()
+
+    s = json.dumps(d, sort_keys=True)
+    return hashlib.sha256(s.encode()).hexdigest()
+
+
+def smk_hash_simconfig(
+    config: AttrsDict,
+    wildcards: Wildcards,
+    field: str | None = None,
+    ignore: list | None = None,
+    **kwargs,
+):
+    """Get the dictionary hash for use in Snakemake rules.
+
+    Parameters
+    ----------
+    config
+        Snakemake config.
+    wildcards
+        Snakemake wildcards object.
+    field
+        if not none, return the value of this key in the simconfig.
+    ignore
+        exclude these fields from the hash.
+    kwargs
+        provide a value for wildcards that might not be present in `wildcards`.
+    """
+    tier = kwargs["tier"] if "tier" in kwargs else wildcards.tier  # noqa: SIM401
+    simid = kwargs["simid"] if "simid" in kwargs else wildcards.simid  # noqa: SIM401
+
+    scfg = get_simconfig(config, tier, simid)
+
+    if field is not None:
+        scfg = scfg.get(field)
+
+    if ignore is not None:
+        if not isinstance(ignore, tuple | list):
+            ignore = [ignore]
+
+        for f in ignore:
+            if f in scfg:
+                scfg.pop(f)
+
+    return hash_dict(scfg)

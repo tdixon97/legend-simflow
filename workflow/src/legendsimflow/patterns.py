@@ -90,16 +90,18 @@ def plots_filepath(config, **kwargs):
 # ver, stp, hit tiers
 
 
-def geom_filename(config):
-    return Path(config.paths.geom) / f"{config['experiment']}-geom.gdml"
+def geom_config(config, **kwargs):
+    pat = str(Path(config.paths.geom) / "{simid}-tier_{tier}-geom-config.yaml")
+    return expand(pat, **kwargs, allow_missing=True)[0]
 
 
-def geom_config(config):
-    return Path(config.paths.config) / f"geom/{config['experiment']}-geom-config.yaml"
+def geom_gdml_filename(config, **kwargs):
+    pat = str(Path(config.paths.geom) / "{simid}-tier_{tier}-geom.gdml")
+    return expand(pat, **kwargs, allow_missing=True)[0]
 
 
 def geom_log_filename(config, time, **kwargs):
-    pat = str(Path(config.paths.log) / time / f"geom/{config['experiment']}-geom.log")
+    pat = str(Path(config.paths.log) / time / "{simid}-tier_{tier}-geom.log")
     return expand(pat, **kwargs, allow_missing=True)[0]
 
 

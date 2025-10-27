@@ -4,7 +4,7 @@ from legendsimflow import aggregate as agg
 
 
 def test_simid_aggregates(config):
-    assert agg.get_simid_njobs(config, "stp", "l200p03-birds-nest-K40") == 10
+    assert agg.get_simid_njobs(config, "stp", "l200p03-birds-nest-K40") == 2
     assert isinstance(
         agg.gen_list_of_simid_inputs(config, "stp", "l200p03-birds-nest-K40"), list
     )
@@ -19,7 +19,7 @@ def test_simid_harvesting(config):
     assert all(isinstance(s, str) for s in simids)
 
     simcfgs = agg.collect_simconfigs(config, ["stp"])
-    assert len(simcfgs) == 4
+    assert len(simcfgs) == 5
 
 
 def test_simid_outputs(config):

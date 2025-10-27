@@ -34,14 +34,16 @@ def test_make_macro(config):
         "/RMG/Generator/Confinement/Physical/AddVolume pen.*",
     ]
     assert set(confine).issubset(text.split("\n"))
-    assert "/RMG/Generator/Confine/SampleOnSurface" not in text
+    assert "/RMG/Generator/Confinement/SampleOnSurface" not in text
 
-    text, fmac = commands.make_remage_macro(config, "l200p03-hpge-surface-K42", "stp")
+    text, fmac = commands.make_remage_macro(
+        config, "l200p03-phbr-surface-Ra228-to-Ac228", "stp"
+    )
     confine = [
         "/RMG/Generator/Confine Volume",
-        "/RMG/Generator/Confinement/Physical/AddVolume V.*",
-        "/RMG/Generator/Confinement/Physical/AddVolume B.*",
-        "/RMG/Generator/Confine/SampleOnSurface true",
+        "/RMG/Generator/Confinement/Physical/AddVolume phbr_spring.*",
+        "/RMG/Generator/Confinement/Physical/AddVolume phbr_washer.*",
+        "/RMG/Generator/Confinement/SampleOnSurface true",
     ]
     assert set(confine).issubset(text.split("\n"))
 
@@ -92,7 +94,9 @@ def test_remage_cli(config):
     cmd = commands.remage_run(config, "l200p03-birds-nest-K40", "stp")
     assert isinstance(cmd, str)
     assert len(cmd) > 0
-    assert shlex.split(cmd)[-1] == patterns.input_simjob_filename(config, tier="stp")
+    assert shlex.split(cmd)[-1] == patterns.input_simjob_filename(
+        config, tier="stp", simid="l200p03-birds-nest-K40"
+    )
 
     cmd = commands.remage_run(config, "l200p03-birds-nest-K40", "stp", macro_free=True)
     mac_cmds = shlex.split(cmd.partition(" -- ")[2])
