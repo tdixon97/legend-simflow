@@ -86,6 +86,12 @@ def gen_target_all():
 
 
 rule all:
+    """Default rule.
+
+    Makes all output files of the highest tier specified in the `make_tiers`
+    configuration variable (holding a list of tiers) and all the simids listed
+    in the `simlist` configuration variable.
+    """
     default_target: True
     input:
         gen_target_all(),

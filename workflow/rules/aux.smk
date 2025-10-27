@@ -28,16 +28,3 @@ rule print_benchmark_stats:
     localrule: True
     script:
         "../scripts/print_benchmark_stats.py"
-
-
-if any([t in make_tiers for t in ("ver", "stp")]):
-
-    rule inspect_simjob_logs:
-        """Reports any warning from the simulation job logs."""
-        localrule: True
-        params:
-            logdir=ldfs.workflow.utils.as_ro(
-                config, Path(config["paths"]["log"]) / proctime
-            ),
-        script:
-            "../scripts/inspect_MaGe_logs.sh"

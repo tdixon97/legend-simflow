@@ -13,10 +13,9 @@
 # You should have received a copy of the GNU Lesser General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""Rules to build the `stp` tier.
-"""
+"""Rules to build the `stp` tier."""
 
-from legendsimflow import aggregate, commands
+from legendsimflow import aggregate, commands, utils
 
 
 rule gen_all_tier_stp:
@@ -39,6 +38,11 @@ rule gen_geom_config:
         Path(config.paths.config) / "geom" / (config.experiment + "-geom-config.yaml"),
     output:
         patterns.geom_config(config),
+    params:
+        # make this rule dependent on the actual simconfig block
+        _simconfig_hash=lambda wc: utils.smk_hash_simconfig(
+            config, wc, "geom_config_extra"
+        ),
     run:
         from dbetto import utils as dbetto_utils
         from legendsimflow import utils
@@ -55,7 +59,8 @@ rule gen_geom_config:
 
 
 rule build_geom_gdml:
-    """Build a concrete geometry GDML file with {mod}`legend-pygeom-l200`."""
+    """Build a concrete geometry GDML file with {mod}`legend-pygeom-l200`.
+    """
     message:
         "Building GDML geometry for {wildcards.tier}.{wildcards.simid}"
     input:
@@ -95,7 +100,7 @@ rule build_tier_stp:
     message:
         "Producing output file for job stp.{wildcards.simid}.{wildcards.jobid}"
     input:
-        # verfile=patterns.ver_filename_for_stp(config, sid),
+        verfile=lambda wc: patterns.ver_filename_for_stp(config, wc.simid),
         geom=patterns.geom_gdml_filename(config, tier="stp"),
     output:
         protected(patterns.output_simjob_filename(config, tier="stp")),
@@ -106,6 +111,10 @@ rule build_tier_stp:
     threads: 1
     params:
         cmd=smk_remage_run,
+        # make this rule dependent on the actual simconfig block
+        _simconfig_hash=lambda wc: utils.smk_hash_simconfig(
+            config, wc, tier="stp", ignore=["geom_config_extra"]
+        ),
     shell:
         "{params.cmd} &> {log}"
 
