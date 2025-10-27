@@ -28,22 +28,22 @@ using Printf
 using RadiationDetectorDSP
 
 
-function compute_drift_time(wf, rise_convergence_creteria, tint)
+function compute_drift_time(wf, rise_convergence_criteria, tint)
     collected_charge = wf[argmax(abs.(wf))]
 
     if collected_charge < 0 # very rare, occurs when electron drift dominates and holes are stuck
         wf *= -1 # to ensure Intersect() works as intended
         collected_charge *= -1
     end
-    intersection = tint(wf, rise_convergence_creteria * collected_charge)
-    dt_intersection = ceil(intersection.x)
+    intersection = tint(wf, rise_convergence_criteria * collected_charge)
+    dt_intersection = ceil(Int, intersection.x)
     dt_fallback = length(wf)
     dt_diff = dt_fallback - dt_intersection
 
     dt = if intersection.multiplicity > 0
         if dt_diff > 2 # dt_intersection is not at the end of the wf
             tint2 = Intersect(mintot = dt_diff) # check intersect again but with min_n_over_thresh (mintot) set to max
-            intersection2 = tint2(wf, rise_convergence_creteria * collected_charge)
+            intersection2 = tint2(wf, rise_convergence_criteria * collected_charge)
             if intersection2.multiplicity > 0  # usually monotonic waveforms which converge very slowly
                 dt_intersection
             else # usually non-monotonic waveforms
@@ -65,13 +65,32 @@ function main()
 
     s = ArgParseSettings()
 
-    @add_arg_table s "--detector" help = "HPGe detector name" required = true
-    @add_arg_table s "--metadata" help = "Path to legend-metadata" required = true
-    @add_arg_table s "--opv-file" help = "Path to file with operational voltages" required =
-        true
-    @add_arg_table s "--output-file" help = "Path to output LH5 file" required = true
+    @add_arg_table s begin
+        "--detector"
+        help = "HPGe detector name"
+        required = true
+    end
+    @add_arg_table s begin
+        "--metadata"
+        help = "Path to legend-metadata"
+        required = true
+    end
+    @add_arg_table s begin
+        "--opv-file"
+        help = "Path to file with operational voltages"
+        required = true
+    end
+    @add_arg_table s begin
+        "--output-file"
+        help = "Path to output LH5 file"
+        required = true
+    end
 
-    @add_arg_table s "--angle" help = "Rotation angle" default = "0"
+    @add_arg_table s begin
+        "--angle"
+        help = "Rotation angle"
+        default = "0"
+    end
 
     @add_arg_table s begin
         "--use-sqrt"
@@ -201,7 +220,7 @@ function main()
     dep_meas = meta[:characterization][:l200_site][:depletion_voltage_in_V]
 
     @info "Measured depletion is $dep_meas V"
-    @info "Simulationed depletion = $dep V"
+    @info "Simulated depletion is $dep V"
     @info "Calculating weighting potential..."
     calculate_weighting_potential!(
         sim,
@@ -217,8 +236,8 @@ function main()
         inner_start = 0 + offset
         inner_stop = boundary - offset
 
-        # compute number of intervals in the interior
-        n = round(Int, (inner_stop - inner_start) / gridsize)
+        # compute number of intervals in the interior (ensure at least 1)
+        n = max(1, round(Int, (inner_stop - inner_start) / gridsize))
 
         # recompute step to fit the inner domain evenly
         step = (inner_stop - inner_start) / n
@@ -267,12 +286,12 @@ function main()
     # prepare thread-local storage
     n = length(in_idx)
     dt_threaded = Vector{Int}(undef, n)
-    rise_convergence_creteria = 1-1e-6
+    rise_convergence_criteria = 1-1e-6
     tint = Intersect(mintot = 0)
 
     function deriv(wf)
         if (!use_triangle)
-            return argmax(diff(ustrip(wf.signal)))
+            return argmax(ustrip(wf.signal))
         else
             trap = TrapezoidalChargeFilter(50u"ns", 5u"ns", 50u"ns");
 
@@ -282,14 +301,14 @@ function main()
             curr_wf = trap(wf_no_units)
 
             idx_A = argmax(curr_wf.signal)
-            return currwf.time[idx_A]
+            return idx_A
         end
     end
 
     function get_positions(idx, handle_nplus = false, verbose = true)
         pos_candidate = spawn_positions[idx]
         # if we dont shift points inside or if the point isn't inside the contact do nothing
-        if (!handle_nplus | (!in(pos_candidate, sim.detector.contacts)))
+        if (!handle_nplus || (!in(pos_candidate, sim.detector.contacts)))
             return pos_candidate
         else
             min_dist = Inf
@@ -301,7 +320,7 @@ function main()
 
             for pos in spawn_positions
 
-                if (!in(pos, sim.detector.contacts) & (in(pos, sim.detector)))
+                if (!in(pos, sim.detector.contacts) && (in(pos, sim.detector)))
                     dist = norm(pos - pos_candidate)
 
                     if (dist<min_dist)
@@ -337,7 +356,7 @@ function main()
 
         if (get_drift_time)
             dt_threaded[i] =
-                compute_drift_time(ustrip(wf.signal), rise_convergence_creteria, tint)
+                compute_drift_time(ustrip(wf.signal), rise_convergence_criteria, tint)
         else
             dt_threaded[i] = deriv(wf)
 
