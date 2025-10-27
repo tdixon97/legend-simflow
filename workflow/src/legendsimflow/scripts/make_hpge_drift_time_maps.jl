@@ -28,6 +28,10 @@ using Printf
 using RadiationDetectorDSP
 
 
+GRID_SIZE = 0.0005 # in m
+CRYSTAL_AXIS_ANGLES = [0, 45] # in deg
+
+
 function compute_drift_time(wf, rise_convergence_criteria, tint)
     collected_charge = wf[argmax(abs.(wf))]
 
@@ -74,14 +78,14 @@ function compute_drift_map_for_angle(
     SSD = SolidStateDetectors
     angle_rad = deg2rad(angle_deg)
 
-    function make_axis(T, boundary, gridsize)
+    function make_axis(T, boundary, GRID_SIZE)
         # define interior domain strictly within (0, boundary)
         offset = 2 * SSD.ConstructiveSolidGeometry.csg_default_tol(T)
         inner_start = 0 + offset
         inner_stop = boundary - offset
 
         # compute number of intervals in the interior (ensure at least 1)
-        n = max(1, round(Int, (inner_stop - inner_start) / gridsize))
+        n = max(1, round(Int, (inner_stop - inner_start) / GRID_SIZE))
 
         # recompute step to fit the inner domain evenly
         step = (inner_stop - inner_start) / n
@@ -95,12 +99,11 @@ function compute_drift_map_for_angle(
         return extended_axis
     end
 
-    gridsize = 0.0005 # in m
     radius = meta.geometry.radius_in_mm / 1000
     height = meta.geometry.height_in_mm / 1000
 
-    x_axis = make_axis(T, radius, gridsize)
-    z_axis = make_axis(T, height, gridsize)
+    x_axis = make_axis(T, radius, GRID_SIZE)
+    z_axis = make_axis(T, height, GRID_SIZE)
 
     spawn_positions = CartesianPoint{T}[]
     idx_spawn_positions = CartesianIndex[]
@@ -177,7 +180,7 @@ function compute_drift_map_for_angle(
         return pos_tmp
     end
 
-    @info "Simulating energy depositions on grid r=0:$gridsize:$radius and z=0:$gridsize:$height at angle $(angle_deg)°..."
+    @info "Simulating energy depositions on grid r=0:$GRID_SIZE:$radius and z=0:$GRID_SIZE:$height at angle $(angle_deg)°..."
     @threads for i = 1:n
         if (i % 1000 == 0)
             x = round(100 * i / n)
@@ -208,10 +211,11 @@ function compute_drift_map_for_angle(
         drift_time[idx] = dt[i]
     end
 
-    output = (
-        r = collect(x_axis) * u"m",
-        z = collect(z_axis) * u"m",
-        drift_time = transpose(drift_time) * u"ns",
+    ang_str = lpad(string(angle_deg), 3, '0')
+    output = (;
+        :r => collect(x_axis) * u"m",
+        :z => collect(z_axis) * u"m",
+        Symbol("drift_time_$(ang_str)_deg") => transpose(drift_time) * u"ns",
     )
 
     return output
@@ -291,6 +295,8 @@ function main()
     opv_path = parsed_args["opv-file"]
     output_file = parsed_args["output-file"]
 
+    isfile(output_file) && error("output file already exists")
+
     use_sqrt = parsed_args["use-sqrt"]
     handle_nplus = parsed_args["use-bulk-drift-time"]
     use_sqrt_new = parsed_args["use-sqrt-new"]
@@ -298,8 +304,6 @@ function main()
     only_holes = parsed_args["only-holes"]
     use_corrections = parsed_args["use-corrections"]
 
-
-    nphi = 36
 
     meta = readprops("$meta_path/hardware/detectors/germanium/diodes/$det.yaml")
 
@@ -353,7 +357,7 @@ function main()
     )
 
     @info "Calculating electric field..."
-    calculate_electric_field!(sim, n_points_in_φ = nphi)
+    calculate_electric_field!(sim)
     dep = nothing
     try
         dep = estimate_depletion_voltage(sim)
@@ -371,14 +375,13 @@ function main()
         sim.detector.contacts[1].id,
         refinement_limits = [0.2, 0.1, 0.05, 0.01],
         verbose = false,
-        n_points_in_φ = nphi,
     )
 
-    # Compute and save drift-time maps for angles 0 and 45 degrees
-    angles_deg = [0.0, 45.0]
-    for a in angles_deg
-        eff_angle = use_sqrt ? (a - 45.0) : a
-        output = compute_drift_map_for_angle(
+    # Compute and save drift-time maps for different angles
+    output = nothing
+    for a in CRYSTAL_AXIS_ANGLES
+        eff_angle = use_sqrt ? (a - 45) : a
+        out = compute_drift_map_for_angle(
             sim,
             meta,
             T,
@@ -389,10 +392,18 @@ function main()
             handle_nplus,
         )
 
-        @info "Saving to disk..."
-        lh5open(output_file, "cw") do f
-            f["$(det)_$(Int(round(a)))deg"] = output
+        key = Symbol("drift_time_$(lpad(string(a), 3, '0'))_deg")
+        if output == nothing
+            output = Dict(pairs(out))
+        else
+            output[key] = out[key]
         end
+
+    end
+
+    @info "Saving to disk..."
+    lh5open(output_file, "cw") do f
+        f[det] = (; output...)
     end
 end
 
