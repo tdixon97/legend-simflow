@@ -59,7 +59,7 @@ function compute_drift_time(wf, rise_convergence_criteria, tint)
     else # no intersection with minimal conditions (mintot=0) found
         dt_fallback
     end
-    dt
+    return dt
 end
 
 
@@ -71,7 +71,7 @@ function compute_drift_map_for_angle(
     get_drift_time,
     use_triangle,
     only_holes,
-    handle_nplus,
+    handle_nplus
 )
     @info "Computing drift time map at angle $angle_deg deg..."
 
@@ -110,7 +110,7 @@ function compute_drift_map_for_angle(
 
     for (i, x) in enumerate(x_axis)
         for (k, z) in enumerate(z_axis)
-            point = T[x*cos(angle_rad), x*sin(angle_rad), z]
+            point = T[x * cos(angle_rad), x * sin(angle_rad), z]
             push!(spawn_positions, CartesianPoint(point))
             push!(idx_spawn_positions, CartesianIndex(i, k))
         end
@@ -118,7 +118,7 @@ function compute_drift_map_for_angle(
     if (!handle_nplus)
         in_idx = findall(
             x -> in(x, sim.detector) && (!in(x, sim.detector.contacts)),
-            spawn_positions,
+            spawn_positions
         )
     else
         in_idx = findall(x -> in(x, sim.detector), spawn_positions)
@@ -181,7 +181,7 @@ function compute_drift_map_for_angle(
     end
 
     @info "Simulating energy depositions on grid r=0:$GRID_SIZE:$radius and z=0:$GRID_SIZE:$height at angle $(angle_deg)°..."
-    @threads for i = 1:n
+    @threads for i in 1:n
         if (i % 1000 == 0)
             x = round(100 * i / n)
             println("...simulating $i out of $n ($x %)")
@@ -215,7 +215,7 @@ function compute_drift_map_for_angle(
     output = (;
         :r => collect(x_axis) * u"m",
         :z => collect(z_axis) * u"m",
-        Symbol("drift_time_$(ang_str)_deg") => transpose(drift_time) * u"ns",
+        Symbol("drift_time_$(ang_str)_deg") => transpose(drift_time) * u"ns"
     )
 
     return output
@@ -332,15 +332,15 @@ function main()
             joinpath(
                 SolidStateDetectors.get_path_to_example_config_files(),
                 "ADLChargeDriftModel",
-                "drift_velocity_config_squareroot.yaml",
-            ),
+                "drift_velocity_config_squareroot.yaml"
+            )
         )
         sim.detector = SolidStateDetector(sim.detector, charge_drift_model)
     end
 
     if (use_sqrt_new)
         charge_drift_model = ADLChargeDriftModel(
-            "$meta_path/simprod/config/pars/ssd/adl-2016-temp-model.yaml",
+            "$meta_path/simprod/config/pars/ssd/adl-2016-temp-model.yaml"
         )
         sim.detector = SolidStateDetector(sim.detector, charge_drift_model)
     end
@@ -348,14 +348,14 @@ function main()
     sim.detector = SolidStateDetector(
         sim.detector,
         contact_id = 2,
-        contact_potential = meta.characterization.l200_site.recommended_voltage_in_V,
+        contact_potential = meta.characterization.l200_site.recommended_voltage_in_V
     )
 
     @info "Calculating electric potential..."
     calculate_electric_potential!(
         sim,
         refinement_limits = [0.2, 0.1, 0.05, 0.01],
-        depletion_handling = true,
+        depletion_handling = true
     )
 
     @info "Calculating electric field..."
@@ -376,7 +376,7 @@ function main()
         sim,
         sim.detector.contacts[1].id,
         refinement_limits = [0.2, 0.1, 0.05, 0.01],
-        verbose = false,
+        verbose = false
     )
 
     # Compute and save drift-time maps for different angles
@@ -391,7 +391,7 @@ function main()
             get_drift_time,
             use_triangle,
             only_holes,
-            handle_nplus,
+            handle_nplus
         )
 
         key = Symbol("drift_time_$(lpad(string(a), 3, '0'))_deg")
@@ -405,7 +405,7 @@ function main()
 
     @info "Saving to disk..."
     lh5open(output_file, "cw") do f
-        f[det] = (; output...)
+        return f[det] = (; output...)
     end
 end
 

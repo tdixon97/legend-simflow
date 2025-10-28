@@ -16,6 +16,26 @@ env:
   FORCE_COLOR: 3
 
 jobs:
+  pre-commit:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.x"
+      - name: Set up Julia
+        uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.10"
+      - name: Set up JuliaFormatter
+        run: julia -e 'using Pkg; Pkg.add("JuliaFormatter")'
+      - uses: pre-commit/action@v3.0.1
+        with:
+          extra_args: --all-files --show-diff-on-failure
+
   unit-tests:
     name: Run legend-simflow unit tests
     runs-on: ${{ matrix.os }}
