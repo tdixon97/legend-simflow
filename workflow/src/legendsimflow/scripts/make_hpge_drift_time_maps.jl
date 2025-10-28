@@ -315,7 +315,8 @@ function main()
         meta.characterization.combined_0vbb_analysis.fccd_in_mm.value = 0.1
     end
 
-    crystal = "V" * @sprintf("%02d", meta.production.order) * meta.production.crystal
+    ids = Dict("bege" => "B", "coax" => "C", "ppc" => "P", "icpc" => "V")
+    crystal = ids[meta.type] * @sprintf("%02d", meta.production.order) * meta.production.crystal
     xtal = readprops("$meta_path/hardware/detectors/germanium/crystals/$crystal.yaml")
 
     if (!use_corrections && (:corrections in keys(xtal.impurity_curve)))
