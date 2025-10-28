@@ -35,11 +35,14 @@ log = logging.getLogger(__name__)
 
 log.info("initializing...")
 
+experiment, period, run, datatype = args.runsel.split("-")
+
+# need to handle db names, damn ivano...
+db_name = "scdbL140" if int(period[1:]) < 13 else "scdb"
+
 lmeta = LegendMetadata()
 scdb = LegendSlowControlDB()
-scdb.connect()
-
-experiment, period, run, datatype = args.runsel.split("-")
+scdb.connect(db_name=db_name)
 
 timestamp = lmeta.datasets.runinfo[period][run][datatype].start_key
 msg = f"start timestamp of {args.runsel} is {timestamp}"
