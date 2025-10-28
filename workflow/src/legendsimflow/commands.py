@@ -170,6 +170,8 @@ def make_remage_macro(config: Mapping, simid: str, tier: str = "stp") -> (str, P
     - The macro template path is taken from the simconfig `template` field.
     - Supported substitutions currently include: ``GENERATOR`` and
       ``CONFINEMENT``.
+    - The user can provide arbitrary macro substitutions with the
+      optional `macro_substitutions` field.
     - The macro is written to the canonical path returned by
       :func:`.patterns.input_simjob_filename`.
     """
@@ -260,6 +262,9 @@ def make_remage_macro(config: Mapping, simid: str, tier: str = "stp") -> (str, P
             confinement = "\n".join(confinement)
 
         mac_subs["CONFINEMENT"] = confinement
+
+    # the user might want to substitute some other variables
+    mac_subs |= sim_cfg.get("macro_substitutions", {})
 
     # read in template and substitute
     template_path = get_simconfig(config, tier, simid=simid, field="template")

@@ -43,3 +43,12 @@ l200p03-sis1-z8224-src1-Ra224-to-Pb208:
   confinement: ~volumes.bulk:source_inner_sis1_source2
   primaries_per_job: 10_000
   number_of_jobs: 2
+
+l200p03-hpge-bulk-high-thr-Rn222-to-Po214:
+  template: $_/template-cal.mac
+  generator: ~defines:Rn222-to-Po214
+  confinement: ~defines:hpge-bulk
+  macro_substitutions:
+    HPGE_ENERGY_THRESHOLD: 450 keV
+  primaries_per_job: 10_000
+  number_of_jobs: 4

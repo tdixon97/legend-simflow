@@ -47,6 +47,11 @@ def test_make_macro(config):
     ]
     assert set(confine).issubset(text.split("\n"))
 
+    text, fmac = commands.make_remage_macro(
+        config, "l200p03-hpge-bulk-high-thr-Rn222-to-Po214", "stp"
+    )
+    assert text is not None
+
 
 def test_make_macro_errors():
     config = conftest.make_config()
