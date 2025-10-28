@@ -35,6 +35,7 @@ paths:
   genconfig: $_/generated/config
   macros: $_/generated/macros
   geom: $_/generated/geom
+  dtmaps: $_/generated/dtmaps
   tier_evt: $_/generated/tier/evt
   tier_hit: ./generated/tier/hit
   tier_pdf: $_/generated/tier/pdf

@@ -14,3 +14,5 @@ def test_all(config):
     assert isinstance(p.output_simjob_regex(config, tier="stp"), str)
     assert isinstance(p.input_simid_filenames(config, 2, tier="stp"), list)
     assert isinstance(p.output_simid_filenames(config, 2, tier="stp"), list)
+
+    assert isinstance(p.output_dtmap_filename(config, hpge_detector="boh"), str)

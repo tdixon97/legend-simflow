@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dbetto import AttrsDict
+
 from legendsimflow import aggregate as agg
 
 
@@ -44,3 +46,18 @@ def test_process_simlist(config):
     ) + agg.gen_list_of_simid_outputs(
         config, "stp", "l200p03-pen-plates-Ra224-to-Pb208"
     )
+
+
+def test_dtmap_stuff(legend_metadata):
+    cry = agg.crystal_meta(
+        legend_metadata, legend_metadata.hardware.detectors.germanium.diodes.V99000A
+    )
+    assert isinstance(cry, AttrsDict)
+    assert cry.name == "000"
+    assert cry.order == "99"
+
+    assert agg.start_key(legend_metadata, "l200-p02-r005-phy") == "20220602T000000Z"
+
+    assert agg.gen_list_of_hpges_valid_for_dtmap(
+        legend_metadata, "l200-p02-r005-phy"
+    ) == ["V99000A"]
