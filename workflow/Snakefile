@@ -25,6 +25,7 @@ from legendmeta import LegendMetadata
 # TODO:
 # - make global vars defined here all caps
 # - think about how to merge the legend-metadata in the config
+# - how to install the Julia stuff in the right way?
 
 
 if not config:
@@ -57,9 +58,14 @@ wildcard_constraints:
 onstart:
     print("INFO: starting workflow")
 
-    # Make sure some packages are initialized before we begin to avoid race conditions
+    # instantiate Julia project
+    print("INFO: instantiating Julia project")
+    shell("julia --project=src/legendsimflow/scripts -e 'using Pkg; Pkg.instantiate()'")
+
+    # make sure some packages are initialized before we begin to avoid race conditions
     # https://numba.readthedocs.io/en/stable/developer/caching.html#cache-sharing
     if not workflow.touch and "precompile_pkg" in config:
+        print("INFO: pre-compiling Numba cache")
         shell(f"python -c 'import {", ".join(config.precompile_pkg)}'")
 
 
