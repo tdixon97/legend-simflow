@@ -7,11 +7,7 @@
 
 /run/initialize
 
-/RMG/Geometry/PrintListOfLogicalVolumes
-/RMG/Geometry/PrintListOfPhysicalVolumes
-
-# discard events without Germanium energy
-/RMG/Output/Germanium/EdepCutLow 0
+/RMG/Output/Germanium/EdepCutLow $HPGE_ENERGY_THRESHOLD
 
 $GENERATOR
 
