@@ -6,9 +6,23 @@ import legenddataflowscripts
 import pytest
 import yaml
 from dbetto import AttrsDict, TextDB
+from legendmeta import LegendMetadata
+from legendtestdata import LegendTestData
 
 testprod = Path(__file__).parent / "dummyprod"
 config_filename = testprod / "simflow-config.yaml"
+
+
+@pytest.fixture(scope="session")
+def legend_testdata():
+    ldata = LegendTestData()
+    ldata.checkout("8247690")
+    return ldata
+
+
+@pytest.fixture(scope="session")
+def legend_metadata(legend_testdata):
+    return LegendMetadata(legend_testdata["legend/metadata"])
 
 
 def make_config():

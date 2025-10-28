@@ -15,6 +15,10 @@
 
 from __future__ import annotations
 
+from dbetto import AttrsDict
+from legendmeta import LegendMetadata
+from legendmeta.police import validate_dict_schema
+
 from . import patterns, utils
 from .utils import get_simconfig
 
@@ -94,6 +98,76 @@ def gen_list_of_all_plots_outputs(config, tier):
         mlist += gen_list_of_plots_outputs(config, tier, simid)
 
     return mlist
+
+
+# drift time maps
+
+
+def crystal_meta(metadata: LegendMetadata, diode_meta: AttrsDict) -> AttrsDict:
+    """Get the crystal metadata starting from the diode metadata."""
+    ids = {"bege": "B", "coax": "C", "ppc": "P", "icpc": "V"}
+    crystal_name = (
+        ids[diode_meta.type]
+        + format(diode_meta.production.order, "02d")
+        + diode_meta.production.crystal
+    )
+    crystal_db = metadata.hardware.detectors.germanium.crystals
+    if crystal_name in crystal_db:
+        return crystal_db[crystal_name]
+    return None
+
+
+def start_key(metadata: LegendMetadata, runid: str) -> str:
+    """Get the start key for a runid."""
+    _, period, run, datatype = runid.split("-")
+    return metadata.datasets.runinfo[period][run][datatype].start_key
+
+
+def gen_list_of_hpges_valid_for_dtmap(
+    metadata: LegendMetadata, runid: str
+) -> list[str]:
+    """Make a list of HPGe detector for which we want to generate a drift time map.
+
+    It generates the list of deployed detectors in `runid` via the LEGEND
+    channelmap, then checks if in the crystal metadata there's all the
+    information required to generate a drift time map.
+    """
+    chmap = metadata.hardware.configuration.channelmaps.on(start_key(metadata, runid))
+
+    hpges = []
+    for _, hpge in chmap.group("system").geds.items():
+        m = crystal_meta(
+            metadata, metadata.hardware.detectors.germanium.diodes[hpge.name]
+        )
+
+        if m is not None:
+            schema = {"impurity_curve": {"parameters": [], "corrections": {"scale": 0}}}
+
+            if validate_dict_schema(
+                m, schema, greedy=False, typecheck=False, verbose=False
+            ):
+                hpges.append(hpge.name)
+
+    return hpges
+
+
+def gen_list_of_dtmaps(
+    config: AttrsDict, metadata: LegendMetadata, runid: str
+) -> list[str]:
+    """Generate the list of HPGe drift time map files for a `runid`."""
+    hpges = gen_list_of_hpges_valid_for_dtmap(metadata, runid)
+    return [
+        patterns.output_dtmap_filename(config, hpge_detector=hpge, runid=runid)
+        for hpge in hpges
+    ]
+
+
+def gen_list_of_merged_dtmaps(config: AttrsDict) -> list[str]:
+    r"""Generate the list of (merged) HPGe drift time map files for all requested `runid`\ s."""
+    runlist = utils.get_some_list(config.runlist)
+    return [
+        patterns.output_dtmap_merged_filename(config, runid=runid) for runid in runlist
+    ]
 
 
 # evt tier

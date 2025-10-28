@@ -22,13 +22,17 @@ import legenddataflowscripts as ldfs
 from legendsimflow import patterns, aggregate, tier_evt
 from legendmeta import LegendMetadata
 
+# TODO:
+# - make global vars defined here all caps
+# - think about how to merge the legend-metadata in the config
+# - how to install the Julia stuff in the right way?
+
 
 if not config:
     raise RuntimeError("you must set a config file with --configfile")
 
 config.setdefault("benchmark", {"enabled": False})
-make_tiers = config.get("make_tiers", ["stp"])
-# make_tiers = config.get("make_tiers", ["ver", "stp", "hit", "evt", "pdf"])
+make_tiers = config.get("make_tiers", ["stp", "hit"])
 ldfs.workflow.utils.subst_vars_in_snakemake_config(workflow, config)
 config = AttrsDict(config)
 
@@ -48,14 +52,20 @@ wildcard_constraints:
     simid=r"[-\w]+",
     jobid=r"\d+",
     runid=r"[-\w]+",
+    hpge_detector=r"[VPBC]\w{6}",
 
 
 onstart:
     print("INFO: starting workflow")
 
-    # Make sure some packages are initialized before we begin to avoid race conditions
+    # instantiate Julia project
+    print("INFO: instantiating Julia project")
+    shell("julia --project=src/legendsimflow/scripts -e 'using Pkg; Pkg.instantiate()'")
+
+    # make sure some packages are initialized before we begin to avoid race conditions
     # https://numba.readthedocs.io/en/stable/developer/caching.html#cache-sharing
     if not workflow.touch and "precompile_pkg" in config:
+        print("INFO: pre-compiling Numba cache")
         shell(f"python -c 'import {", ".join(config.precompile_pkg)}'")
 
 

@@ -25,6 +25,9 @@ Definitions:
 - ``simjob``: one job of a simulation run (corresponds to one macro file and one output file)
 - ``jobid``: zero-padded integer (i.e., a string) used to label a simulation job
 """
+# TODO:
+# - use coherent naming
+# - use attribute access everywhere
 
 from __future__ import annotations
 
@@ -87,7 +90,7 @@ def plots_filepath(config, **kwargs):
     return expand(pat, **kwargs, allow_missing=True)[0]
 
 
-# ver, stp, hit tiers
+# geometry
 
 
 def geom_config(config, **kwargs):
@@ -103,6 +106,9 @@ def geom_gdml_filename(config, **kwargs):
 def geom_log_filename(config, time, **kwargs):
     pat = str(Path(config.paths.log) / time / "{simid}-tier_{tier}-geom.log")
     return expand(pat, **kwargs, allow_missing=True)[0]
+
+
+# ver, stp, hit tiers
 
 
 def input_simjob_filename(config, **kwargs):
@@ -166,6 +172,31 @@ def ver_filename_for_stp(config, simid):
     if "vertices" in sconfig:
         return output_simjob_filename(config, tier="ver", simid=sconfig.vertices)
     return []
+
+
+# drift time maps
+
+
+def output_dtmap_filename(config, **kwargs):
+    pat = str(
+        Path(config.paths.dtmaps) / "{runid}-{hpge_detector}-hpge-drift-time-map.lh5"
+    )
+    return expand(pat, **kwargs, allow_missing=True)[0]
+
+
+def output_dtmap_merged_filename(config, **kwargs):
+    pat = str(Path(config.paths.dtmaps) / "{runid}-hpge-drift-time-maps.lh5")
+    return expand(pat, **kwargs, allow_missing=True)[0]
+
+
+def log_dtmap_filename(config, time, **kwargs):
+    pat = str(
+        Path(config.paths.log)
+        / time
+        / "hpge_dtmaps"
+        / "{runid}-{hpge_detector}-drift-time-map.log"
+    )
+    return expand(pat, **kwargs, allow_missing=True)[0]
 
 
 # evt tier
