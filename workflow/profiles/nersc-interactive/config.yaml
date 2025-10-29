@@ -1,0 +1,14 @@
+configfile: simflow-config.yaml
+keep-going: true
+rerun-incomplete: true
+cores: all
+
+software-deployment-method: conda
+
+default-storage-provider: fs
+local-storage-prefix: $SCRATCH/legend-simflow
+shared-fs-usage:
+  - persistence
+  - software-deployment
+  - sources
+  - source-cache
