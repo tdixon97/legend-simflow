@@ -55,17 +55,18 @@ wildcard_constraints:
 onstart:
     print("INFO: starting workflow")
 
-    # instantiate Julia project
-    print("INFO: instantiating Julia project")
-    shell(
-        "julia --project=workflow/src/legendsimflow/scripts -e 'using Pkg; Pkg.instantiate()'"
-    )
+    if not config.benchmark:
+        # instantiate Julia project
+        print("INFO: instantiating Julia project")
+        shell(
+            "julia --project=workflow/src/legendsimflow/scripts -e 'using Pkg; Pkg.instantiate()'"
+        )
 
-    # make sure some packages are initialized before we begin to avoid race conditions
-    # https://numba.readthedocs.io/en/stable/developer/caching.html#cache-sharing
-    if not workflow.touch and "precompile_pkg" in config:
-        print("INFO: pre-compiling Numba cache")
-        shell(f"python -c 'import {", ".join(config.precompile_pkg)}'")
+        # make sure some packages are initialized before we begin to avoid race conditions
+        # https://numba.readthedocs.io/en/stable/developer/caching.html#cache-sharing
+        if not workflow.touch and "precompile_pkg" in config:
+            print("INFO: pre-compiling Numba cache")
+            shell(f"python -c 'import {", ".join(config.precompile_pkg)}'")
 
 
 include: "rules/aux.smk"
