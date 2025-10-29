@@ -111,9 +111,16 @@ rule build_tier_stp:
     threads: 1
     params:
         cmd=smk_remage_run,
-        # make this rule dependent on the actual simconfig block
+        # make this rule dependent on the actual simconfig block it is very
+        # important here to ignore the simconfig fields that, if updated,
+        # should not trigger re-creation of existing files. we ignore then
+        # `number_of_jobs` and in the future we could also ignore
+        # `primaries_per_job`, such that Snakemake will keep the existing stp
+        # files with a different number of primaries on disk. Bonus: we ignore
+        # `geom_config_extra` because that dependency is already tracked by
+        # `input.geom`.
         _simconfig_hash=lambda wc: utils.smk_hash_simconfig(
-            config, wc, tier="stp", ignore=["geom_config_extra"]
+            config, wc, tier="stp", ignore=["geom_config_extra", "number_of_jobs"]
         ),
     shell:
         "{params.cmd} &> {log}"
