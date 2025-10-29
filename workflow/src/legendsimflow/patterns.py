@@ -36,8 +36,6 @@ from pathlib import Path
 from dbetto import AttrsDict
 from snakemake.io import expand
 
-from .utils import get_simconfig
-
 FILETYPES = AttrsDict(
     {
         "input": {
@@ -165,13 +163,13 @@ def output_simid_filenames(config, n_macros, **kwargs):
     return expand(pat, jobid=jobids, **kwargs, allow_missing=True)
 
 
-def ver_filename_for_stp(config, simid):
-    """Returns the vertices file needed for the 'stp' tier job, if needed. Used
-    as lambda function in the `build_tier_stp` Snakemake rule."""
-    sconfig = get_simconfig(config, "stp", simid)
-    if "vertices" in sconfig:
-        return output_simjob_filename(config, tier="ver", simid=sconfig.vertices)
-    return []
+# def ver_filename_for_stp(config, simid):
+#     """Returns the vertices file needed for the 'stp' tier job, if needed. Used
+#     as lambda function in the `build_tier_stp` Snakemake rule."""
+#     sconfig = get_simconfig(config, "stp", simid)
+#     if "vertices" in sconfig:
+#         return output_simjob_filename(config, tier="ver", simid=sconfig.vertices)
+#     return []
 
 
 # drift time maps

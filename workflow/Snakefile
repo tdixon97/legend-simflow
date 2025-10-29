@@ -43,9 +43,6 @@ metadata = LegendMetadata(config.paths.metadata)
 if "legend_metadata_version" in config:
     metadata.checkout(config.legend_metadata_version)
 
-# augment the config with the metadata TextDB
-config["metadata"] = metadata.simprod.config
-
 
 wildcard_constraints:
     tier=r"\w+",

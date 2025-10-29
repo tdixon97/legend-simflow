@@ -20,6 +20,7 @@ import json
 from pathlib import Path
 
 from dbetto import AttrsDict
+from legendmeta import LegendMetadata
 from snakemake.io import Wildcards
 
 from .exceptions import SimflowConfigError
@@ -40,7 +41,11 @@ def get_some_list(field: str | list) -> list:
 
 
 def get_simconfig(
-    config: AttrsDict, tier: str, simid: str | None = None, field: str | None = None
+    config: AttrsDict,
+    metadata: LegendMetadata,
+    tier: str,
+    simid: str | None = None,
+    field: str | None = None,
 ) -> AttrsDict:
     """Get the simulation configuration.
 
@@ -57,13 +62,14 @@ def get_simconfig(
     field
         if not none, return the value of this key in the simconfig.
     """
-    block = f"metadata/tier/{tier}/{config.experiment}/simconfig/{simid}"
+    block = f"simprod/config/tier/{tier}/{config.experiment}/simconfig/{simid}"
+    _m = metadata.simprod.config
     try:
         if simid is None:
-            return config.metadata.tier[tier][config.experiment].simconfig
+            return _m.tier[tier][config.experiment].simconfig
         if field is None:
-            return config.metadata.tier[tier][config.experiment].simconfig[simid]
-        return config.metadata.tier[tier][config.experiment].simconfig[simid][field]
+            return _m.tier[tier][config.experiment].simconfig[simid]
+        return _m.tier[tier][config.experiment].simconfig[simid][field]
     except (KeyError, FileNotFoundError) as e:
         raise SimflowConfigError(block, e) from e
 
@@ -79,6 +85,7 @@ def hash_dict(d):
 
 def smk_hash_simconfig(
     config: AttrsDict,
+    metadata: LegendMetadata,
     wildcards: Wildcards,
     field: str | None = None,
     ignore: list | None = None,
@@ -102,7 +109,7 @@ def smk_hash_simconfig(
     tier = kwargs["tier"] if "tier" in kwargs else wildcards.tier  # noqa: SIM401
     simid = kwargs["simid"] if "simid" in kwargs else wildcards.simid  # noqa: SIM401
 
-    scfg = get_simconfig(config, tier, simid)
+    scfg = get_simconfig(config, metadata, tier, simid)
 
     if field is not None:
         scfg = scfg.get(field)

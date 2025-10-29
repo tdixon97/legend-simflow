@@ -21,7 +21,7 @@ def legend_testdata():
 
 
 @pytest.fixture(scope="session")
-def legend_metadata(legend_testdata):
+def legend_test_metadata(legend_testdata):
     return LegendMetadata(legend_testdata["legend/metadata"])
 
 
@@ -32,15 +32,21 @@ def make_config():
     legenddataflowscripts.subst_vars(config, var_values={"_": testprod})
     assert config is not None
 
-    metadata = TextDB(testprod / "inputs")
-    config["metadata"] = metadata.simprod.config
-
     return AttrsDict(config)
 
 
 @pytest.fixture(scope="session")
 def config():
     return make_config()
+
+
+def make_metadata():
+    return TextDB(testprod / "inputs")
+
+
+@pytest.fixture(scope="session")
+def metadata():
+    return make_metadata()
 
 
 class mock_workflow_class:
