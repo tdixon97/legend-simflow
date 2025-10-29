@@ -1,0 +1,7 @@
+channels:
+  - conda-forge
+  - bioconda
+  - nodefaults
+dependencies:
+  - legend-pygeom-l200 ==0.5.1
+  - snakemake-storage-plugin-fs

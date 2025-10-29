@@ -35,6 +35,7 @@ config.setdefault("benchmark", {"enabled": False})
 make_tiers = config.get("make_tiers", ["stp", "hit"])
 ldfs.workflow.utils.subst_vars_in_snakemake_config(workflow, config)
 config = AttrsDict(config)
+envs_dir = f"{workflow.basedir}/envs"
 
 proctime = datetime.now().strftime("%Y%m%dT%H%M%SZ")
 
@@ -42,6 +43,9 @@ proctime = datetime.now().strftime("%Y%m%dT%H%M%SZ")
 metadata = LegendMetadata(config.paths.metadata)
 if "legend_metadata_version" in config:
     metadata.checkout(config.legend_metadata_version)
+
+
+conda: f"{envs_dir}/global.yaml"
 
 
 wildcard_constraints:
@@ -92,7 +96,7 @@ def gen_target_all():
                 # aggregate.gen_list_of_all_plots_outputs(config, tier="ver"),
             )
     else:
-        return aggregate.process_simlist(config)
+        return aggregate.process_simlist(config, metadata)
 
 
 rule all:
