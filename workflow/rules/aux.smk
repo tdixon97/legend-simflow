@@ -19,7 +19,7 @@ rule print_stats:
     No wildcards are used."""
     localrule: True
     script:
-        "../scripts/print_simprod_stats.py"
+        "../src/legendsimflow/scripts/print_simprod_stats.py"
 
 
 rule print_benchmark_stats:
@@ -27,4 +27,4 @@ rule print_benchmark_stats:
     No wildcards are used."""
     localrule: True
     script:
-        "../scripts/print_benchmark_stats.py"
+        "../src/legendsimflow/scripts/print_benchmark_stats.py"

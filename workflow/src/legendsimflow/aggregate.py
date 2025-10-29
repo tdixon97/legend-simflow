@@ -23,7 +23,7 @@ from . import patterns, utils
 from .utils import get_simconfig
 
 
-def get_simid_njobs(config, tier, simid):
+def get_simid_njobs(config, metadata, tier, simid):
     """Returns the number of macros that will be generated for a given `tier`
     and `simid`."""
     if tier not in ("ver", "stp"):
@@ -32,24 +32,24 @@ def get_simid_njobs(config, tier, simid):
     if "benchmark" in config and config.benchmark.get("enabled", False):
         return 1
 
-    sconfig = get_simconfig(config, tier, simid=simid)
+    sconfig = get_simconfig(config, metadata, tier, simid=simid)
 
     if "vertices" in sconfig and "number_of_jobs" not in sconfig:
-        return len(gen_list_of_simid_outputs(config, "ver", sconfig.vertices))
+        return len(gen_list_of_simid_outputs(config, metadata, "ver", sconfig.vertices))
     if "number_of_jobs" in sconfig:
         return sconfig.number_of_jobs
-    return get_simconfig(config, tier, simid=simid, field="number_of_jobs")
+    return get_simconfig(config, metadata, tier, simid=simid, field="number_of_jobs")
 
 
-def gen_list_of_simid_inputs(config, tier, simid):
+def gen_list_of_simid_inputs(config, metadata, tier, simid):
     """Generates the full list of input files for a `tier` and `simid`."""
-    n_jobs = get_simid_njobs(config, tier, simid)
+    n_jobs = get_simid_njobs(config, metadata, tier, simid)
     return patterns.input_simid_filenames(config, n_jobs, tier=tier, simid=simid)
 
 
-def gen_list_of_simid_outputs(config, tier, simid, max_files=None):
+def gen_list_of_simid_outputs(config, metadata, tier, simid, max_files=None):
     """Generates the full list of output files for a `simid`."""
-    n_jobs = get_simid_njobs(config, tier, simid)
+    n_jobs = get_simid_njobs(config, metadata, tier, simid)
     if max_files is not None:
         n_jobs = min(n_jobs, max_files)
     return patterns.output_simid_filenames(config, n_jobs, tier=tier, simid=simid)
@@ -67,35 +67,35 @@ def gen_list_of_plots_outputs(config, tier, simid):
 # simid independent stuff
 
 
-def collect_simconfigs(config, tiers):
+def collect_simconfigs(config, metadata, tiers):
     cfgs = []
     for tier in tiers:
-        for sid in get_simconfig(config, tier):
+        for sid in get_simconfig(config, metadata, tier):
             cfgs.append((tier, sid))
 
     return cfgs
 
 
-def gen_list_of_all_simids(config, tier):
+def gen_list_of_all_simids(config, metadata, tier):
     if tier not in ("ver", "stp"):
         tier = "stp"
 
-    return get_simconfig(config, tier).keys()
+    return get_simconfig(config, metadata, tier).keys()
 
 
-def gen_list_of_all_simid_outputs(config, tier):
+def gen_list_of_all_simid_outputs(config, metadata, tier):
     mlist = []
-    slist = gen_list_of_all_simids(config, tier)
+    slist = gen_list_of_all_simids(config, metadata, tier)
     for simid in slist:
-        mlist += gen_list_of_simid_outputs(config, tier, simid)
+        mlist += gen_list_of_simid_outputs(config, metadata, tier, simid)
 
     return mlist
 
 
-def gen_list_of_all_plots_outputs(config, tier):
+def gen_list_of_all_plots_outputs(config, metadata, tier):
     mlist = []
-    for simid in gen_list_of_all_simids(config, tier):
-        mlist += gen_list_of_plots_outputs(config, tier, simid)
+    for simid in gen_list_of_all_simids(config, metadata, tier):
+        mlist += gen_list_of_plots_outputs(config, metadata, tier, simid)
 
     return mlist
 
@@ -207,7 +207,7 @@ def gen_list_of_all_tier_pdf_outputs(config):
     return mlist
 
 
-def process_simlist(config, simlist=None):
+def process_simlist(config, metadata, simlist=None):
     if simlist is None:
         simlist = utils.get_some_list(config.simlist)
 
@@ -224,7 +224,7 @@ def process_simlist(config, simlist=None):
 
         # mlist += gen_list_of_plots_outputs(config, tier, simid)
         if tier in ("ver", "stp", "hit"):
-            mlist += gen_list_of_simid_outputs(config, tier, simid)
+            mlist += gen_list_of_simid_outputs(config, metadata, tier, simid)
         elif tier == "evt":
             mlist += gen_list_of_tier_evt_outputs(config, simid)
         elif tier == "pdf":

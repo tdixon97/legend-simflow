@@ -1,7 +1,7 @@
 rule gen_all_tier_hit:
     """Aggregate and produce all the hit tier files."""
     input:
-        aggregate.gen_list_of_all_simid_outputs(config, tier="hit"),
+        aggregate.gen_list_of_all_simid_outputs(config, metadata, tier="hit"),
 
 
 # rule build_tier_hit:

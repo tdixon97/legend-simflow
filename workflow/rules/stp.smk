@@ -22,7 +22,7 @@ rule gen_all_tier_stp:
     """Build the entire `stp` tier."""
     input:
         # aggregate.gen_list_of_all_plots_outputs(config, tier="stp"),
-        aggregate.gen_list_of_all_simid_outputs(config, tier="stp"),
+        aggregate.gen_list_of_all_simid_outputs(config, metadata, tier="stp"),
 
 
 rule gen_geom_config:
@@ -41,7 +41,7 @@ rule gen_geom_config:
     params:
         # make this rule dependent on the actual simconfig block
         _simconfig_hash=lambda wc: utils.smk_hash_simconfig(
-            config, wc, "geom_config_extra"
+            config, metadata, wc, "geom_config_extra"
         ),
     run:
         from dbetto import utils as dbetto_utils
@@ -49,7 +49,7 @@ rule gen_geom_config:
 
         gconfig = dbetto_utils.load_dict(input[0])
         sconfig = utils.get_simconfig(
-            config, tier=wildcards.tier, simid=wildcards.simid
+            config, metadata, tier=wildcards.tier, simid=wildcards.simid
         )
 
         if "geom_config_extra" in sconfig:
@@ -78,6 +78,7 @@ def smk_remage_run(wildcards, input, output, threads):
     """Generate the remage command line for use in Snakemake rules."""
     return commands.remage_run(
         config,
+        metadata,
         wildcards.simid,
         tier="stp",
         geom=input.geom,
@@ -100,7 +101,7 @@ rule build_tier_stp:
     message:
         "Producing output file for job stp.{wildcards.simid}.{wildcards.jobid}"
     input:
-        verfile=lambda wc: patterns.ver_filename_for_stp(config, wc.simid),
+        # verfile=lambda wc: patterns.ver_filename_for_stp(config, wc.simid),
         geom=patterns.geom_gdml_filename(config, tier="stp"),
     output:
         protected(patterns.output_simjob_filename(config, tier="stp")),
@@ -120,7 +121,11 @@ rule build_tier_stp:
         # `geom_config_extra` because that dependency is already tracked by
         # `input.geom`.
         _simconfig_hash=lambda wc: utils.smk_hash_simconfig(
-            config, wc, tier="stp", ignore=["geom_config_extra", "number_of_jobs"]
+            config,
+            metadata,
+            wc,
+            tier="stp",
+            ignore=["geom_config_extra", "number_of_jobs"],
         ),
     shell:
         "{params.cmd} &> {log}"

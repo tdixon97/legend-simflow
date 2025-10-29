@@ -1,13 +1,12 @@
 experiment: l200p03
 
 runlist:
-  - "l200-p02-r000-phy"
+  - l200-p02-r000-phy
 
 benchmark:
   enabled: false
   n_primaries:
-    stp: 5000
-    ver: 10000
+    stp: 999
 
 paths:
   benchmarks: $_/generated/benchmarks
