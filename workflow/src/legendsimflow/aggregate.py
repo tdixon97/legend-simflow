@@ -209,7 +209,7 @@ def gen_list_of_all_tier_pdf_outputs(config):
 
 def process_simlist(config, metadata, simlist=None):
     if simlist is None:
-        simlist = utils.get_some_list(config.simlist)
+        simlist = config.simlist
 
     # if it's a list, every item is a simid
     # otherwise, interpret as comma-separated list
