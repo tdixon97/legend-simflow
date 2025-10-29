@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import conftest
 from dbetto import AttrsDict
 
 from legendsimflow import aggregate as agg
@@ -16,6 +17,15 @@ def test_simid_aggregates(config, metadata):
             config, metadata, "stp", "l200p03-birds-nest-K40"
         ),
         list,
+    )
+
+    config_bench = conftest.make_config()
+    config_bench.benchmark.enabled = True
+    config_bench.benchmark.n_primaries.stp = 999
+
+    assert (
+        agg.get_simid_njobs(config_bench, metadata, "stp", "l200p03-birds-nest-K40")
+        == 1
     )
 
 

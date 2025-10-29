@@ -111,3 +111,11 @@ def test_remage_cli(config, metadata):
     )
     mac_cmds = shlex.split(cmd.partition(" -- ")[2])
     assert all(cmd[0] == "/" for cmd in mac_cmds)
+
+    config_bench = conftest.make_config()
+    config_bench.benchmark.enabled = True
+    config_bench.benchmark.n_primaries.stp = 999
+
+    cmd = commands.remage_run(config_bench, metadata, "l200p03-birds-nest-K40", "stp")
+    cmdline = shlex.split(cmd.partition(" -- ")[0])
+    assert "N_EVENTS=999" in cmdline
