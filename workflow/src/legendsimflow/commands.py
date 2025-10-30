@@ -6,7 +6,6 @@ from pathlib import Path
 
 import legenddataflowscripts as lds
 import numpy as np
-from legendmeta import LegendMetadata
 
 from . import patterns
 from .exceptions import SimflowConfigError
@@ -137,9 +136,7 @@ def remage_run(
     return shlex.join(cmd)
 
 
-def make_remage_macro(
-    config: Mapping, simid: str, tier: str = "stp"
-) -> (str, Path):
+def make_remage_macro(config: Mapping, simid: str, tier: str = "stp") -> (str, Path):
     """Render the remage macro for a given simulation and write it to disk.
 
     This function reads the simulation configuration for the provided tier/simid,

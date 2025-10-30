@@ -20,7 +20,6 @@ import json
 from pathlib import Path
 
 from dbetto import AttrsDict
-from legendmeta import LegendMetadata
 from snakemake.io import Wildcards
 
 from .exceptions import SimflowConfigError

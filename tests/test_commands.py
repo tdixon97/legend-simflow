@@ -22,13 +22,11 @@ def test_make_macro(config):
     assert set(
         config.metadata.simprod.config.tier.stp.l200p03.confinement["birds-nest"]
     ).issubset(text.split("\n"))
-    assert set(config.metadata.simprod.config.tier.stp.l200p03.generators["K40"]).issubset(
-        text.split("\n")
-    )
+    assert set(
+        config.metadata.simprod.config.tier.stp.l200p03.generators["K40"]
+    ).issubset(text.split("\n"))
 
-    text, fmac = commands.make_remage_macro(
-        config, "pen-plates-Ra224-to-Pb208", "stp"
-    )
+    text, fmac = commands.make_remage_macro(config, "pen-plates-Ra224-to-Pb208", "stp")
     assert set(
         config.metadata.simprod.config.tier.stp.l200p03.generators["Ra224-to-Pb208"]
     ).issubset(text.split("\n"))
@@ -109,9 +107,7 @@ def test_remage_cli(config):
         config, tier="stp", simid="birds-nest-K40"
     )
 
-    cmd = commands.remage_run(
-        config, "birds-nest-K40", "stp", macro_free=True
-    )
+    cmd = commands.remage_run(config, "birds-nest-K40", "stp", macro_free=True)
     mac_cmds = shlex.split(cmd.partition(" -- ")[2])
     assert all(cmd[0] == "/" for cmd in mac_cmds)
 

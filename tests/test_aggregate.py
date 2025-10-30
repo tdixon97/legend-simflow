@@ -53,9 +53,7 @@ def test_process_simlist(config, metadata):
     )
     assert targets == agg.gen_list_of_simid_outputs(
         config, "stp", "birds-nest-K40"
-    ) + agg.gen_list_of_simid_outputs(
-        config, "stp", "pen-plates-Ra224-to-Pb208"
-    )
+    ) + agg.gen_list_of_simid_outputs(config, "stp", "pen-plates-Ra224-to-Pb208")
 
 
 def test_dtmap_stuff(legend_test_metadata):
