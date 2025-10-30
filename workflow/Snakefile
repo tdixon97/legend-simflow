@@ -44,7 +44,7 @@ proctime = datetime.now().strftime("%Y%m%dT%H%M%SZ")
 metadata = LegendMetadata(config.paths.metadata)
 if "legend_metadata_version" in config:
     metadata.checkout(config.legend_metadata_version)
-
+config["metadata"] = metadata
 
 conda: f"{basedir}/envs/global.yaml"
 
@@ -99,7 +99,7 @@ def gen_target_all():
                 # aggregate.gen_list_of_all_plots_outputs(config, tier="ver"),
             )
     else:
-        return aggregate.process_simlist(config, metadata)
+        return aggregate.process_simlist(config)
 
 
 rule all:

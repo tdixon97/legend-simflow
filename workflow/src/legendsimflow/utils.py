@@ -43,7 +43,6 @@ def get_some_list(field: str | list) -> list:
 # TODO: improve error messages
 def get_simconfig(
     config: AttrsDict,
-    metadata: LegendMetadata,
     tier: str,
     simid: str | None = None,
     field: str | None = None,
@@ -64,7 +63,7 @@ def get_simconfig(
         if not none, return the value of this key in the simconfig.
     """
     block = f"simprod/config/tier/{tier}/{config.experiment}/simconfig/{simid}"
-    _m = metadata.simprod.config
+    _m = config.metadata.simprod.config
     try:
         if simid is None:
             return _m.tier[tier][config.experiment].simconfig
@@ -86,7 +85,6 @@ def hash_dict(d):
 
 def smk_hash_simconfig(
     config: AttrsDict,
-    metadata: LegendMetadata,
     wildcards: Wildcards,
     field: str | None = None,
     ignore: list | None = None,
@@ -110,7 +108,7 @@ def smk_hash_simconfig(
     tier = kwargs["tier"] if "tier" in kwargs else wildcards.tier  # noqa: SIM401
     simid = kwargs["simid"] if "simid" in kwargs else wildcards.simid  # noqa: SIM401
 
-    scfg = get_simconfig(config, metadata, tier, simid)
+    scfg = get_simconfig(config, tier, simid)
 
     if field is not None:
         scfg = scfg.get(field)

@@ -28,7 +28,7 @@ from .utils import get_simconfig
 log = logging.getLogger(__name__)
 
 
-def get_simid_njobs(config, metadata, tier, simid):
+def get_simid_njobs(config, tier, simid):
     """Returns the number of macros that will be generated for a given `tier`
     and `simid`."""
     if tier not in ("ver", "stp"):
@@ -37,24 +37,24 @@ def get_simid_njobs(config, metadata, tier, simid):
     if "benchmark" in config and config.benchmark.get("enabled", False):
         return 1
 
-    sconfig = get_simconfig(config, metadata, tier, simid=simid)
+    sconfig = get_simconfig(config, tier, simid=simid)
 
     if "vertices" in sconfig and "number_of_jobs" not in sconfig:
-        return len(gen_list_of_simid_outputs(config, metadata, "ver", sconfig.vertices))
+        return len(gen_list_of_simid_outputs(config, "ver", sconfig.vertices))
     if "number_of_jobs" in sconfig:
         return sconfig.number_of_jobs
-    return get_simconfig(config, metadata, tier, simid=simid, field="number_of_jobs")
+    return get_simconfig(config, tier, simid=simid, field="number_of_jobs")
 
 
-def gen_list_of_simid_inputs(config, metadata, tier, simid):
+def gen_list_of_simid_inputs(config, tier, simid):
     """Generates the full list of input files for a `tier` and `simid`."""
-    n_jobs = get_simid_njobs(config, metadata, tier, simid)
+    n_jobs = get_simid_njobs(config, tier, simid)
     return patterns.input_simid_filenames(config, n_jobs, tier=tier, simid=simid)
 
 
-def gen_list_of_simid_outputs(config, metadata, tier, simid, max_files=None):
+def gen_list_of_simid_outputs(config, tier, simid, max_files=None):
     """Generates the full list of output files for a `simid`."""
-    n_jobs = get_simid_njobs(config, metadata, tier, simid)
+    n_jobs = get_simid_njobs(config, tier, simid)
     if max_files is not None:
         n_jobs = min(n_jobs, max_files)
     return patterns.output_simid_filenames(config, n_jobs, tier=tier, simid=simid)
@@ -76,35 +76,35 @@ def get_runlist(config):
     return sorted(utils.get_some_list(config.runlist))
 
 
-def collect_simconfigs(config, metadata, tiers):
+def collect_simconfigs(config, tiers):
     cfgs = []
     for tier in tiers:
-        for sid in get_simconfig(config, metadata, tier):
+        for sid in get_simconfig(config, tier):
             cfgs.append((tier, sid))
 
     return cfgs
 
 
-def gen_list_of_all_simids(config, metadata, tier):
+def gen_list_of_all_simids(config, tier):
     if tier not in ("ver", "stp"):
         tier = "stp"
 
-    return get_simconfig(config, metadata, tier).keys()
+    return get_simconfig(config, tier).keys()
 
 
-def gen_list_of_all_simid_outputs(config, metadata, tier):
+def gen_list_of_all_simid_outputs(config, tier):
     mlist = []
-    slist = gen_list_of_all_simids(config, metadata, tier)
+    slist = gen_list_of_all_simids(config, tier)
     for simid in slist:
-        mlist += gen_list_of_simid_outputs(config, metadata, tier, simid)
+        mlist += gen_list_of_simid_outputs(config, tier, simid)
 
     return mlist
 
 
-def gen_list_of_all_plots_outputs(config, metadata, tier):
+def gen_list_of_all_plots_outputs(config, tier):
     mlist = []
-    for simid in gen_list_of_all_simids(config, metadata, tier):
-        mlist += gen_list_of_plots_outputs(config, metadata, tier, simid)
+    for simid in gen_list_of_all_simids(config, tier):
+        mlist += gen_list_of_plots_outputs(config, tier, simid)
 
     return mlist
 
@@ -166,11 +166,9 @@ def gen_list_of_hpges_valid_for_dtmap(
     return hpges
 
 
-def gen_list_of_dtmaps(
-    config: AttrsDict, metadata: LegendMetadata, runid: str
-) -> list[str]:
+def gen_list_of_dtmaps(config: AttrsDict, runid: str) -> list[str]:
     """Generate the list of HPGe drift time map files for a `runid`."""
-    hpges = gen_list_of_hpges_valid_for_dtmap(metadata, runid)
+    hpges = gen_list_of_hpges_valid_for_dtmap(config.metadata, runid)
     return [
         patterns.output_dtmap_filename(config, hpge_detector=hpge, runid=runid)
         for hpge in hpges
@@ -220,7 +218,7 @@ def gen_list_of_all_tier_pdf_outputs(config):
     return mlist
 
 
-def process_simlist(config, metadata, simlist=None):
+def process_simlist(config, simlist=None):
     if simlist is None:
         simlist = config.simlist
 
@@ -244,7 +242,7 @@ def process_simlist(config, metadata, simlist=None):
 
         # mlist += gen_list_of_plots_outputs(config, tier, simid)
         if tier in ("ver", "stp", "hit"):
-            mlist += gen_list_of_simid_outputs(config, metadata, tier, simid)
+            mlist += gen_list_of_simid_outputs(config, tier, simid)
         elif tier == "evt":
             mlist += gen_list_of_tier_evt_outputs(config, simid)
         elif tier == "pdf":

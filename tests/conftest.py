@@ -36,8 +36,10 @@ def make_config():
 
 
 @pytest.fixture(scope="session")
-def config():
-    return make_config()
+def config(metadata):
+    cfg = make_config()
+    cfg.metadata = metadata
+    return cfg
 
 
 def make_metadata():

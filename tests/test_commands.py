@@ -9,8 +9,8 @@ import pytest
 from legendsimflow import SimflowConfigError, commands, patterns
 
 
-def test_make_macro(config, metadata):
-    text, fmac = commands.make_remage_macro(config, metadata, "birds-nest-K40", "stp")
+def test_make_macro(config):
+    text, fmac = commands.make_remage_macro(config, "birds-nest-K40", "stp")
 
     assert (
         fmac
@@ -20,17 +20,17 @@ def test_make_macro(config, metadata):
     assert fmac.is_file()
 
     assert set(
-        metadata.simprod.config.tier.stp.l200p03.confinement["birds-nest"]
+        config.metadata.simprod.config.tier.stp.l200p03.confinement["birds-nest"]
     ).issubset(text.split("\n"))
-    assert set(metadata.simprod.config.tier.stp.l200p03.generators["K40"]).issubset(
+    assert set(config.metadata.simprod.config.tier.stp.l200p03.generators["K40"]).issubset(
         text.split("\n")
     )
 
     text, fmac = commands.make_remage_macro(
-        config, metadata, "pen-plates-Ra224-to-Pb208", "stp"
+        config, "pen-plates-Ra224-to-Pb208", "stp"
     )
     assert set(
-        metadata.simprod.config.tier.stp.l200p03.generators["Ra224-to-Pb208"]
+        config.metadata.simprod.config.tier.stp.l200p03.generators["Ra224-to-Pb208"]
     ).issubset(text.split("\n"))
 
     confine = [
@@ -41,7 +41,7 @@ def test_make_macro(config, metadata):
     assert "/RMG/Generator/Confinement/SampleOnSurface" not in text
 
     text, fmac = commands.make_remage_macro(
-        config, metadata, "phbr-surface-Ra228-to-Ac228", "stp"
+        config, "phbr-surface-Ra228-to-Ac228", "stp"
     )
     confine = [
         "/RMG/Generator/Confine Volume",
@@ -52,7 +52,7 @@ def test_make_macro(config, metadata):
     assert set(confine).issubset(text.split("\n"))
 
     text, fmac = commands.make_remage_macro(
-        config, metadata, "hpge-bulk-high-thr-Rn222-to-Po214", "stp"
+        config, "hpge-bulk-high-thr-Rn222-to-Po214", "stp"
     )
     assert text is not None
 
@@ -60,24 +60,25 @@ def test_make_macro(config, metadata):
 def test_make_macro_errors(metadata):
     config = conftest.make_config()
     metadata = conftest.make_metadata()
+    config.metadata = metadata
 
     metadata.simprod.config.tier.stp.l200p03.simconfig["birds-nest-K40"][
         "generator"
     ] = "coddue"
     with pytest.raises(SimflowConfigError):
-        commands.make_remage_macro(config, metadata, "birds-nest-K40", "stp")
+        commands.make_remage_macro(config, "birds-nest-K40", "stp")
 
     metadata.simprod.config.tier.stp.l200p03.simconfig["birds-nest-K40"][
         "generator"
     ] = "~coddue:boh"
     with pytest.raises(SimflowConfigError):
-        commands.make_remage_macro(config, metadata, "birds-nest-K40", "stp")
+        commands.make_remage_macro(config, "birds-nest-K40", "stp")
 
     metadata.simprod.config.tier.stp.l200p03.simconfig["birds-nest-K40"][
         "generator"
     ] = "~defines:boh"
     with pytest.raises(SimflowConfigError):
-        commands.make_remage_macro(config, metadata, "birds-nest-K40", "stp")
+        commands.make_remage_macro(config, "birds-nest-K40", "stp")
 
     config = conftest.make_config()
     metadata.simprod.config.tier.stp.l200p03.simconfig["birds-nest-K40"][
@@ -85,7 +86,7 @@ def test_make_macro_errors(metadata):
     ] = "~baaaaaa:beh"
 
     with pytest.raises(SimflowConfigError):
-        commands.make_remage_macro(config, metadata, "birds-nest-K40", "stp")
+        commands.make_remage_macro(config, "birds-nest-K40", "stp")
 
     metadata.simprod.config.tier.stp.l200p03.simconfig["birds-nest-K40"][
         "confinement"
@@ -100,8 +101,8 @@ def test_make_macro_errors(metadata):
         commands.make_remage_macro(config, metadata, "birds-nest-K40", "stp")
 
 
-def test_remage_cli(config, metadata):
-    cmd = commands.remage_run(config, metadata, "birds-nest-K40", "stp")
+def test_remage_cli(config):
+    cmd = commands.remage_run(config, "birds-nest-K40", "stp")
     assert isinstance(cmd, str)
     assert len(cmd) > 0
     assert shlex.split(cmd)[-1] == patterns.input_simjob_filename(
@@ -109,7 +110,7 @@ def test_remage_cli(config, metadata):
     )
 
     cmd = commands.remage_run(
-        config, metadata, "birds-nest-K40", "stp", macro_free=True
+        config, "birds-nest-K40", "stp", macro_free=True
     )
     mac_cmds = shlex.split(cmd.partition(" -- ")[2])
     assert all(cmd[0] == "/" for cmd in mac_cmds)
@@ -117,7 +118,8 @@ def test_remage_cli(config, metadata):
     config_bench = conftest.make_config()
     config_bench.benchmark.enabled = True
     config_bench.benchmark.n_primaries.stp = 999
+    config_bench.metadata = conftest.make_metadata()
 
-    cmd = commands.remage_run(config_bench, metadata, "birds-nest-K40", "stp")
+    cmd = commands.remage_run(config_bench, "birds-nest-K40", "stp")
     cmdline = shlex.split(cmd.partition(" -- ")[0])
     assert "N_EVENTS=999" in cmdline

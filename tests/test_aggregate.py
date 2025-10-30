@@ -7,40 +7,41 @@ from legendsimflow import aggregate as agg
 
 
 def test_simid_aggregates(config, metadata):
-    assert agg.get_simid_njobs(config, metadata, "stp", "birds-nest-K40") == 2
+    assert agg.get_simid_njobs(config, "stp", "birds-nest-K40") == 2
     assert isinstance(
-        agg.gen_list_of_simid_inputs(config, metadata, "stp", "birds-nest-K40"),
+        agg.gen_list_of_simid_inputs(config, "stp", "birds-nest-K40"),
         list,
     )
     assert isinstance(
-        agg.gen_list_of_simid_outputs(config, metadata, "stp", "birds-nest-K40"),
+        agg.gen_list_of_simid_outputs(config, "stp", "birds-nest-K40"),
         list,
     )
 
     config_bench = conftest.make_config()
     config_bench.benchmark.enabled = True
     config_bench.benchmark.n_primaries.stp = 999
+    config_bench.metadata = metadata
 
-    assert agg.get_simid_njobs(config_bench, metadata, "stp", "birds-nest-K40") == 1
+    assert agg.get_simid_njobs(config_bench, "stp", "birds-nest-K40") == 1
 
 
 def test_simid_harvesting(config, metadata):
-    simids = agg.gen_list_of_all_simids(config, metadata, "stp")
+    simids = agg.gen_list_of_all_simids(config, "stp")
     assert isinstance(simids, type({}.keys()))
     assert all(isinstance(s, str) for s in simids)
 
-    simcfgs = agg.collect_simconfigs(config, metadata, ["stp"])
+    simcfgs = agg.collect_simconfigs(config, ["stp"])
     assert len(simcfgs) == 6
 
 
 def test_simid_outputs(config, metadata):
-    outputs = agg.gen_list_of_all_simid_outputs(config, metadata, "stp")
+    outputs = agg.gen_list_of_all_simid_outputs(config, "stp")
     assert isinstance(outputs, list)
     assert all(isinstance(s, str) for s in outputs)
     assert len(outputs) == sum(
         [
-            agg.get_simid_njobs(config, metadata, "stp", s)
-            for s in agg.gen_list_of_all_simids(config, metadata, "stp")
+            agg.get_simid_njobs(config, "stp", s)
+            for s in agg.gen_list_of_all_simids(config, "stp")
         ]
     )
 
@@ -48,13 +49,12 @@ def test_simid_outputs(config, metadata):
 def test_process_simlist(config, metadata):
     targets = agg.process_simlist(
         config,
-        metadata,
         simlist=["stp.birds-nest-K40", "stp.pen-plates-Ra224-to-Pb208"],
     )
     assert targets == agg.gen_list_of_simid_outputs(
-        config, metadata, "stp", "birds-nest-K40"
+        config, "stp", "birds-nest-K40"
     ) + agg.gen_list_of_simid_outputs(
-        config, metadata, "stp", "pen-plates-Ra224-to-Pb208"
+        config, "stp", "pen-plates-Ra224-to-Pb208"
     )
 
 
