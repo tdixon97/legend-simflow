@@ -12,10 +12,10 @@ rule build_tier_hit:
         geom=patterns.geom_gdml_filename(config, tier="stp"),
         stp_file=patterns.output_simjob_filename(config, tier="stp"),
         optmap_lar=config.paths.optical_maps.lar,
-        # optmap_pen=config.paths.optical_maps.pen,
-        # optmap_fiber=config.paths.optical_maps.fiber,
     output:
         patterns.output_simjob_filename(config, tier="hit"),
+    params:
+        metadata=metadata,
     log:
         patterns.log_filename(config, proctime, tier="hit"),
     benchmark:
