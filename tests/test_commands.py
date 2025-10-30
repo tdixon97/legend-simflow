@@ -90,13 +90,13 @@ def test_make_macro_errors(metadata):
         "confinement"
     ] = "~defines:beh"
     with pytest.raises(SimflowConfigError):
-        commands.make_remage_macro(config, metadata, "birds-nest-K40", "stp")
+        commands.make_remage_macro(config, "birds-nest-K40", "stp")
 
     metadata.simprod.config.tier.stp.l200p03.simconfig["birds-nest-K40"][
         "confinement"
     ] = {}
     with pytest.raises(SimflowConfigError):
-        commands.make_remage_macro(config, metadata, "birds-nest-K40", "stp")
+        commands.make_remage_macro(config, "birds-nest-K40", "stp")
 
 
 def test_remage_cli(config):

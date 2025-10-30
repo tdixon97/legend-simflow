@@ -25,7 +25,7 @@ def test_simid_aggregates(config, metadata):
     assert agg.get_simid_njobs(config_bench, "stp", "birds-nest-K40") == 1
 
 
-def test_simid_harvesting(config, metadata):
+def test_simid_harvesting(config):
     simids = agg.gen_list_of_all_simids(config, "stp")
     assert isinstance(simids, type({}.keys()))
     assert all(isinstance(s, str) for s in simids)
@@ -34,7 +34,7 @@ def test_simid_harvesting(config, metadata):
     assert len(simcfgs) == 6
 
 
-def test_simid_outputs(config, metadata):
+def test_simid_outputs(config):
     outputs = agg.gen_list_of_all_simid_outputs(config, "stp")
     assert isinstance(outputs, list)
     assert all(isinstance(s, str) for s in outputs)
@@ -46,7 +46,7 @@ def test_simid_outputs(config, metadata):
     )
 
 
-def test_process_simlist(config, metadata):
+def test_process_simlist(config):
     targets = agg.process_simlist(
         config,
         simlist=["stp.birds-nest-K40", "stp.pen-plates-Ra224-to-Pb208"],

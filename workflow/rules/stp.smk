@@ -41,7 +41,7 @@ rule gen_geom_config:
     params:
         # make this rule dependent on the actual simconfig block
         _simconfig_hash=lambda wc: utils.smk_hash_simconfig(
-            config, metadata, wc, "geom_config_extra"
+            config, wc, "geom_config_extra"
         ),
     run:
         from dbetto import utils as dbetto_utils
