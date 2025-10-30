@@ -114,6 +114,7 @@ def geom_log_filename(config, time, **kwargs):
     pat = str(
         Path(config.paths.log)
         / time
+        / "geom"
         / (config.experiment + "-{simid}-tier_{tier}-geom.log")
     )
     return expand(pat, **kwargs, allow_missing=True)[0]

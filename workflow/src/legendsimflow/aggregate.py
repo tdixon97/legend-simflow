@@ -20,6 +20,7 @@ from legendmeta import LegendMetadata
 from legendmeta.police import validate_dict_schema
 
 from . import patterns, utils
+from .exceptions import SimflowConfigError
 from .utils import get_simconfig
 
 
@@ -219,6 +220,13 @@ def process_simlist(config, metadata, simlist=None):
     mlist = []
     for line in simlist:
         # each line is in the format <tier>.<simid>
+        if len(line.split(".")) != 2:
+            msg = (
+                "simflow-config.runlist",
+                f"item '{line}' is not in the format <tier>.<simid>",
+            )
+            raise SimflowConfigError(*msg)
+
         tier = line.split(".")[0].strip()
         simid = line.split(".")[1].strip()
 
