@@ -19,16 +19,15 @@ function sbatch_submit() {
         --ntasks-per-node=1 \
         --account m2676 \
         --constraint cpu \
-        --time 12:00:00 \
+        --time 8:00:00 \
         --qos regular \
         --licenses scratch,cfs \
         --job-name "$job" \
         --output "$logdir/$job.log" \
         --error "$logdir/$job.log" \
-        --image legendexp/legend-software:latest \
         --wrap "
             srun snakemake \
-                --shadow-prefix $PSCRATCH \
+                --workflow-profile workflow/profiles/nersc-interactive \
                 $*
         "
 }

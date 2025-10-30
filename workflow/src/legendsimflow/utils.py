@@ -40,6 +40,7 @@ def get_some_list(field: str | list) -> list:
     return slist
 
 
+# TODO: improve error messages
 def get_simconfig(
     config: AttrsDict,
     metadata: LegendMetadata,
