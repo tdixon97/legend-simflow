@@ -79,6 +79,7 @@ def test_make_macro_errors(metadata):
         commands.make_remage_macro(config, "birds-nest-K40", "stp")
 
     config = conftest.make_config()
+    config.metadata = metadata
     metadata.simprod.config.tier.stp.l200p03.simconfig["birds-nest-K40"][
         "confinement"
     ] = "~baaaaaa:beh"
