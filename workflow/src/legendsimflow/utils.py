@@ -124,3 +124,11 @@ def smk_hash_simconfig(
                 scfg.pop(f)
 
     return hash_dict(scfg)
+
+
+def setup_logdir_link(config, proctime):
+    # create a handy link to access latest log directory
+    link = Path(config.paths.log) / "latest"
+    if link.exists() or link.is_symlink():
+        link.unlink()
+    link.symlink_to(proctime, target_is_directory=True)

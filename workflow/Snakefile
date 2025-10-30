@@ -19,7 +19,7 @@ from datetime import datetime
 from dbetto import AttrsDict
 
 import legenddataflowscripts as ldfs
-from legendsimflow import patterns, aggregate, tier_evt
+from legendsimflow import patterns, aggregate, tier_evt, utils
 from legendmeta import LegendMetadata
 
 # TODO:
@@ -58,6 +58,8 @@ wildcard_constraints:
 
 onstart:
     print("INFO: starting workflow")
+
+    utils.setup_logdir_link(config, proctime)
 
     if not config.benchmark:
         # instantiate Julia project
