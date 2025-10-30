@@ -111,7 +111,7 @@ rule build_tier_stp:
         patterns.benchmark_filename(config, tier="stp")
     threads: 1
     conda:
-        f"{envs_dir}/remage.yaml"
+        f"{basedir}/envs/remage.yaml"
     params:
         cmd=smk_remage_run,
         # make this rule dependent on the actual simconfig block it is very

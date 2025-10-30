@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from dbetto import AttrsDict
 from legendmeta import LegendMetadata
 from legendmeta.police import validate_dict_schema
@@ -22,6 +24,8 @@ from legendmeta.police import validate_dict_schema
 from . import patterns, utils
 from .exceptions import SimflowConfigError
 from .utils import get_simconfig
+
+log = logging.getLogger(__name__)
 
 
 def get_simid_njobs(config, metadata, tier, simid):
@@ -66,6 +70,10 @@ def gen_list_of_plots_outputs(config, tier, simid):
 
 
 # simid independent stuff
+
+
+def get_runlist(config):
+    return sorted(utils.get_some_list(config.runlist))
 
 
 def collect_simconfigs(config, metadata, tiers):
@@ -142,12 +150,18 @@ def gen_list_of_hpges_valid_for_dtmap(
         )
 
         if m is not None:
-            schema = {"impurity_curve": {"parameters": [], "corrections": {"scale": 0}}}
+            schema = {
+                "impurity_curve": {"parameters": None, "corrections": {"scale": 0}}
+            }
 
             if validate_dict_schema(
                 m, schema, greedy=False, typecheck=False, verbose=False
             ):
                 hpges.append(hpge.name)
+
+    if len(hpges) == 0:
+        msg = f"the list of HPGes valid for drift time map generation in {runid} is empty!"
+        log.warning(msg)
 
     return hpges
 
@@ -165,9 +179,9 @@ def gen_list_of_dtmaps(
 
 def gen_list_of_merged_dtmaps(config: AttrsDict) -> list[str]:
     r"""Generate the list of (merged) HPGe drift time map files for all requested `runid`\ s."""
-    runlist = utils.get_some_list(config.runlist)
     return [
-        patterns.output_dtmap_merged_filename(config, runid=runid) for runid in runlist
+        patterns.output_dtmap_merged_filename(config, runid=runid)
+        for runid in get_runlist(config)
     ]
 
 
@@ -175,10 +189,8 @@ def gen_list_of_merged_dtmaps(config: AttrsDict) -> list[str]:
 
 
 def gen_list_of_tier_evt_outputs(config, simid):
-    runlist = utils.get_some_list(config.runlist)
-
     mlist = []
-    for runid in runlist:
+    for runid in get_runlist(config):
         mlist += [patterns.output_evt_filename(config, simid=simid, runid=runid)]
 
     return mlist
@@ -222,7 +234,7 @@ def process_simlist(config, metadata, simlist=None):
         # each line is in the format <tier>.<simid>
         if len(line.split(".")) != 2:
             msg = (
-                "simflow-config.runlist",
+                "simflow-config.simlist",
                 f"item '{line}' is not in the format <tier>.<simid>",
             )
             raise SimflowConfigError(*msg)
