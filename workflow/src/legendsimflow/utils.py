@@ -124,8 +124,11 @@ def smk_hash_simconfig(
 
 
 def setup_logdir_link(config, proctime):
+    logdir = Path(config.paths.log)
+    logdir.mkdir(parents=True, exist_ok=True)
+
     # create a handy link to access latest log directory
-    link = Path(config.paths.log) / "latest"
+    link = logdir / "latest"
     if link.exists() or link.is_symlink():
         link.unlink()
     link.symlink_to(proctime, target_is_directory=True)
