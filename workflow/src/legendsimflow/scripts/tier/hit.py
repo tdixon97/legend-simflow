@@ -53,7 +53,7 @@ hit_file = snakemake.output[0]  # noqa: F821
 optmap_lar_file = snakemake.input.optmap_lar  # noqa: F821
 gdml_file = snakemake.input.geom  # noqa: F821
 log_file = snakemake.log[0]  # noqa: F821
-metadata = snakemake.params.metadata  # noqa: F821
+metadata = snakemake.config.metadata  # noqa: F821
 
 # setup logging
 log = ldfs.utils.build_log(metadata.simprod.config.logging, log_file)

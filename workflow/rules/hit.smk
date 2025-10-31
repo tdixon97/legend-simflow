@@ -1,7 +1,7 @@
 rule gen_all_tier_hit:
     """Aggregate and produce all the hit tier files."""
     input:
-        aggregate.gen_list_of_all_simid_outputs(config, metadata, tier="hit"),
+        aggregate.gen_list_of_all_simid_outputs(config, tier="hit"),
 
 
 rule build_tier_hit:
@@ -15,8 +15,6 @@ rule build_tier_hit:
         hpge_dtmaps=aggregate.gen_list_of_merged_dtmaps(config),
     output:
         patterns.output_simjob_filename(config, tier="hit"),
-    params:
-        metadata=metadata,
     log:
         patterns.log_filename(config, proctime, tier="hit"),
     benchmark:
@@ -26,7 +24,7 @@ rule build_tier_hit:
 
 
 def smk_hpge_drift_time_map_inputs(wildcards):
-    meta = metadata.hardware.detectors.germanium.diodes[wildcards.hpge_detector]
+    meta = config.metadata.hardware.detectors.germanium.diodes[wildcards.hpge_detector]
     ids = {"bege": "B", "coax": "C", "ppc": "P", "icpc": "V"}
     crystal_name = (
         ids[meta.type] + format(meta.production.order, "02d") + meta.production.crystal
@@ -84,7 +82,7 @@ rule merge_hpge_drift_time_maps:
     message:
         "Merging HPGe drift time map files for {wildcards.runid}"
     input:
-        lambda wc: aggregate.gen_list_of_dtmaps(config, metadata, wc.runid),
+        lambda wc: aggregate.gen_list_of_dtmaps(config, wc.runid),
     output:
         patterns.output_dtmap_merged_filename(config),
     params:

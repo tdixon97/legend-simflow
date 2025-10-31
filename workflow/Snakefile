@@ -41,10 +41,11 @@ proctime = datetime.now().strftime("%Y%m%dT%H%M%SZ")
 
 # NOTE: this will attempt a clone of legend-metadata, if the directory does not exist
 # NOTE: don't use lazy=True, we need a fully functional TextDB
-metadata = LegendMetadata(config.paths.metadata)
+_metadata = LegendMetadata(config.paths.metadata)
 if "legend_metadata_version" in config:
-    metadata.checkout(config.legend_metadata_version)
-config["metadata"] = metadata
+    _metadata.checkout(config.legend_metadata_version)
+config["metadata"] = _metadata
+
 
 conda: f"{basedir}/envs/global.yaml"
 
