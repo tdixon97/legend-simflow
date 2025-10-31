@@ -16,19 +16,28 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import awkward as ak
+import h5py
 import legenddataflowscripts as ldfs
 import legenddataflowscripts.utils
 import legendhpges
 import lgdo
 import pyg4ometry
+import pygama.evt
 import pygeomtools
 import reboost.hpge.surface
 import reboost.math.functions
 import reboost.spms
 from dbetto import AttrsDict
 from legendmeta.police import validate_dict_schema
-from lgdo import lh5
+from lgdo import LGDO, lh5
 from lgdo.lh5 import LH5Iterator
+
+stp_file = snakemake.input.stp_file  # noqa: F821
+hit_file = snakemake.output[0]  # noqa: F821
+optmap_lar_file = snakemake.input.optmap_lar  # noqa: F821
+gdml_file = snakemake.input.geom  # noqa: F821
+log_file = snakemake.log[0]  # noqa: F821
+metadata = snakemake.config.metadata  # noqa: F821
 
 
 def get_sensvols(geom, det_type: str | None = None) -> list[str]:
@@ -38,22 +47,55 @@ def get_sensvols(geom, det_type: str | None = None) -> list[str]:
     return list(sensvols.keys())
 
 
-def write_chunk(iterator, table, objname):
+def make_output_chunk(chunk: LGDO) -> lgdo.Table:
+    out = lgdo.Table(size=len(chunk))
+
+    if "t0" in chunk and isinstance(chunk.t0, lgdo.Array):
+        t0 = chunk.t0
+    else:
+        t0 = lgdo.Array(
+            ak.fill_none(ak.firsts(chunk.time.view_as("ak"), axis=-1), 0),
+            attrs={"units": "ns"},
+        )
+
+    if isinstance(chunk.evtid, lgdo.Array):
+        evtid = chunk.evtid
+    else:
+        evtid = lgdo.Array(
+            ak.fill_none(ak.firsts(chunk.evtid.view_as("ak"), axis=-1), 0)
+        )
+
+    out.add_field("t0", t0)
+    out.add_field("evtid", evtid)
+
+    return out
+
+
+def write_chunk(iterator, table, det_name, uid):
     wo_mode = "append_column" if iterator.current_i_entry == 0 else "append"
-    return lh5.write(
+    lh5.write(
         table,
-        objname,
+        f"hit/{det_name}",
         hit_file,
         wo_mode=wo_mode,
     )
+    if iterator.current_i_entry == 0:
+        if "hit/__by_uid__" not in lh5.ls(hit_file, "hit/"):
+            log.debug("creating hit/__by_uid__ folder")
+            lh5.write(lgdo.Struct(), "hit/__by_uid__", hit_file)
 
+        msg = f"creating soft link hit/__by_uid__/det{uid} -> hit/{det_name}"
+        log.debug(msg)
+        with h5py.File(hit_file, "r+") as f:
+            # create uid -> det_name symlink
+            f[f"hit/__by_uid__/det{uid}"] = h5py.SoftLink(f"/hit/{det_name}")
+            # updated the struct datatype attribute by adding the new symlink
+            dt = f["hit/__by_uid__"].attrs.pop("datatype")
+            fields = [*lgdo.lh5.datatype.get_struct_fields(dt), f"det{uid}"]
+            f["hit/__by_uid__"].attrs["datatype"] = (
+                "struct{" + ",".join(sorted(fields)) + "}"
+            )
 
-stp_file = snakemake.input.stp_file  # noqa: F821
-hit_file = snakemake.output[0]  # noqa: F821
-optmap_lar_file = snakemake.input.optmap_lar  # noqa: F821
-gdml_file = snakemake.input.geom  # noqa: F821
-log_file = snakemake.log[0]  # noqa: F821
-metadata = snakemake.config.metadata  # noqa: F821
 
 # setup logging
 log = ldfs.utils.build_log(metadata.simprod.config.logging, log_file)
@@ -106,8 +148,8 @@ for det_name, geom_meta in sensvols.items():
 
         det_loc = geom.physicalVolumeDict[det_name].position.eval()
 
-        for _chunk in iterator:
-            chunk = _chunk.view_as("ak")
+        for lgdo_chunk in iterator:
+            chunk = lgdo_chunk.view_as("ak")
             _distance_to_surf = AttrsDict()
 
             for surf in ("nplus", "pplus", "passive"):
@@ -130,16 +172,17 @@ for det_name, geom_meta in sensvols.items():
 
             energy = ak.sum(chunk.edep * _activeness, axis=-1)
 
-            out_table = lgdo.Table(size=len(chunk))
+            out_table = make_output_chunk(lgdo_chunk)
             out_table.add_field("energy", lgdo.Array(energy, attrs={"units": "keV"}))
-            write_chunk(iterator, out_table, f"hit/{det_name}")
+
+            write_chunk(iterator, out_table, det_name, geom_meta.uid)
 
     # process the scintillator output
     if geom_meta.detector_type == "scintillator" and det_name == "lar":
         log.info("processing the 'lar' scintillator table...")
 
-        for _chunk in iterator:
-            chunk = _chunk.view_as("ak")
+        for lgdo_chunk in iterator:
+            chunk = lgdo_chunk.view_as("ak")
 
             _scint_ph = reboost.spms.pe.emitted_scintillation_photons(
                 chunk.edep, chunk.particle, "lar"
@@ -165,6 +208,21 @@ for det_name, geom_meta in sensvols.items():
                     map_scaling=0.1,
                 )
 
-                out_table = lgdo.Table(size=len(chunk))
-                out_table.add_field("t0", photoelectrons)
-                write_chunk(iterator, out_table, f"hit/{sipm}")
+                out_table = make_output_chunk(lgdo_chunk)
+                out_table.add_field("time", photoelectrons)
+                write_chunk(iterator, out_table, sipm, sipm_uid)
+
+# build the TCM
+# use tables keyed by UID in the __by_uid__ group.  in this way, the
+# TCM will index tables by UID.  the coincidence criterium is based
+# on Geant4 event identifier and time of the hits
+# NOTE: uses the same time window as in build_hit() reshaping
+log.debug("building the TCM")
+pygama.evt.build_tcm(
+    [(hit_file, r"hit/__by_uid__/*")],  # input_tables
+    ["evtid", "t0"],  # coin_cols
+    hash_func=r"(?<=hit/__by_uid__/det)\d+",
+    coin_windows=[0, 10_000],
+    out_file=hit_file,
+    wo_mode="write_safe",
+)

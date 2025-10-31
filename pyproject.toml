@@ -64,6 +64,7 @@ runprod = [
     "snakemake>=8.16",
     "legend-pygeom-l200",
     "reboost >=0.7",
+    "pygama >=2.2.3",
 ]
 test = [
     "legend_simflow[runprod]",
