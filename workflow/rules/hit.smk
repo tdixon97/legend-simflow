@@ -62,11 +62,13 @@ rule build_hpge_drift_time_map:
         temp(patterns.output_dtmap_filename(config)),
     log:
         patterns.log_dtmap_filename(config, proctime),
-    threads: 4
+    threads: 1
     params:
         metadata_path=config.paths.metadata,
     conda:
         f"{basedir}/envs/julia.yaml"
+    # NOTE: not using the `script` directive here since Snakemake has no nice
+    # way to handle package dependencies nor Project.toml
     shell:
         "julia --project=workflow/src/legendsimflow/scripts --threads {threads}"
         "  workflow/src/legendsimflow/scripts/make_hpge_drift_time_maps.jl"
