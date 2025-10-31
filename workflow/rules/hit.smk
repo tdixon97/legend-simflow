@@ -65,6 +65,8 @@ rule build_hpge_drift_time_map:
     threads: 4
     params:
         metadata_path=config.paths.metadata,
+    conda:
+        f"{basedir}/envs/julia.yaml"
     shell:
         "julia --project=workflow/src/legendsimflow/scripts --threads {threads}"
         "  workflow/src/legendsimflow/scripts/make_hpge_drift_time_maps.jl"
@@ -87,6 +89,8 @@ rule merge_hpge_drift_time_maps:
         patterns.output_dtmap_merged_filename(config),
     params:
         input_regex=patterns.output_dtmap_filename(config, hpge_detector="*"),
+    conda:
+        f"{basedir}/envs/julia.yaml"
     shell:
         r"""
         shopt -s nullglob
