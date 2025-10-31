@@ -3,7 +3,6 @@ from __future__ import annotations
 import shlex
 from pathlib import Path
 
-import conftest
 import pytest
 
 from legendsimflow import SimflowConfigError, commands, patterns
@@ -55,10 +54,9 @@ def test_make_macro(config):
     assert text is not None
 
 
-def test_make_macro_errors(metadata):
-    config = conftest.make_config()
-    metadata = conftest.make_metadata()
-    config.metadata = metadata
+def test_make_macro_errors_1(fresh_config):
+    config = fresh_config
+    metadata = fresh_config.metadata
 
     metadata.simprod.config.tier.stp.l200p03.simconfig["birds-nest-K40"][
         "generator"
@@ -78,8 +76,11 @@ def test_make_macro_errors(metadata):
     with pytest.raises(SimflowConfigError):
         commands.make_remage_macro(config, "birds-nest-K40", "stp")
 
-    config = conftest.make_config()
-    config.metadata = metadata
+
+def test_make_macro_errors_2(fresh_config):
+    config = fresh_config
+    metadata = fresh_config.metadata
+
     metadata.simprod.config.tier.stp.l200p03.simconfig["birds-nest-K40"][
         "confinement"
     ] = "~baaaaaa:beh"
@@ -100,7 +101,9 @@ def test_make_macro_errors(metadata):
         commands.make_remage_macro(config, "birds-nest-K40", "stp")
 
 
-def test_remage_cli(config):
+def test_remage_cli(fresh_config):
+    config = fresh_config
+
     cmd = commands.remage_run(config, "birds-nest-K40", "stp")
     assert isinstance(cmd, str)
     assert len(cmd) > 0
@@ -112,11 +115,9 @@ def test_remage_cli(config):
     mac_cmds = shlex.split(cmd.partition(" -- ")[2])
     assert all(cmd[0] == "/" for cmd in mac_cmds)
 
-    config_bench = conftest.make_config()
-    config_bench.benchmark.enabled = True
-    config_bench.benchmark.n_primaries.stp = 999
-    config_bench.metadata = conftest.make_metadata()
+    config.benchmark.enabled = True
+    config.benchmark.n_primaries.stp = 999
 
-    cmd = commands.remage_run(config_bench, "birds-nest-K40", "stp")
+    cmd = commands.remage_run(config, "birds-nest-K40", "stp")
     cmdline = shlex.split(cmd.partition(" -- ")[0])
     assert "N_EVENTS=999" in cmdline
