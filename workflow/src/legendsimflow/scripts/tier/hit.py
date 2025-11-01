@@ -38,6 +38,7 @@ optmap_lar_file = snakemake.input.optmap_lar  # noqa: F821
 gdml_file = snakemake.input.geom  # noqa: F821
 log_file = snakemake.log[0]  # noqa: F821
 metadata = snakemake.config.metadata  # noqa: F821
+hpge_dtmap_files = snakemake.inputs.hpge_dtmaps  # noqa: F821
 
 
 def get_sensvols(geom, det_type: str | None = None) -> list[str]:
@@ -148,6 +149,12 @@ for det_name, geom_meta in sensvols.items():
 
         det_loc = geom.physicalVolumeDict[det_name].position.eval()
 
+        log.debug("loading drift time map")
+        dt_map = reboost.hpge.get_hpge_scalar_rz_field(
+            hpge_dtmap_files[0], det_name, "drift_time_000_deg"
+        )
+
+        # iterate over input data
         for lgdo_chunk in iterator:
             chunk = lgdo_chunk.view_as("ak")
             _distance_to_surf = AttrsDict()
@@ -172,8 +179,19 @@ for det_name, geom_meta in sensvols.items():
 
             energy = ak.sum(chunk.edep * _activeness, axis=-1)
 
+            _drift_time = reboost.hpge.psd.drift_time(
+                chunk.xloc,
+                chunk.yloc,
+                chunk.zloc,
+                dt_map,
+                det_loc,
+            )
+
+            dt_heuristic = reboost.hpge.psd.drift_time(_drift_time, chunk.edep)
+
             out_table = make_output_chunk(lgdo_chunk)
             out_table.add_field("energy", lgdo.Array(energy, attrs={"units": "keV"}))
+            out_table.add_field("drift_time_heuristic", lgdo.Array(dt_heuristic))
 
             write_chunk(iterator, out_table, det_name, geom_meta.uid)
 
