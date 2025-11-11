@@ -50,7 +50,7 @@ dynamic = ["version"]
 
 dependencies = [
     "colorlog",
-    "pylegendmeta >=1.3.2",
+    "pylegendmeta >=1.3.3",
     "pip",
     "legend-dataflow-scripts >=0.2.2",
     "dbetto >=1.3.2",

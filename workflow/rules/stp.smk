@@ -68,7 +68,7 @@ rule build_geom_gdml:
     output:
         patterns.geom_gdml_filename(config),
     log:
-        patterns.geom_log_filename(config, proctime),
+        patterns.geom_log_filename(config, SIMFLOW_CONTEXT.proctime),
     shell:
         "LEGEND_METADATA={config.paths.metadata} "
         "legend-pygeom-l200 --verbose --config {input} -- {output} &> {log}"
@@ -105,12 +105,12 @@ rule build_tier_stp:
     output:
         protected(patterns.output_simjob_filename(config, tier="stp")),
     log:
-        patterns.log_filename(config, proctime, tier="stp"),
+        patterns.log_filename(config, SIMFLOW_CONTEXT.proctime, tier="stp"),
     benchmark:
         patterns.benchmark_filename(config, tier="stp")
     threads: 1
     conda:
-        f"{basedir}/envs/remage.yaml"
+        f"{SIMFLOW_CONTEXT.basedir}/envs/remage.yaml"
     params:
         cmd=smk_remage_run,
         # make this rule dependent on the actual simconfig block it is very

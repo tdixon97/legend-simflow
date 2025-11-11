@@ -16,7 +16,7 @@ rule build_tier_hit:
     output:
         patterns.output_simjob_filename(config, tier="hit"),
     log:
-        patterns.log_filename(config, proctime, tier="hit"),
+        patterns.log_filename(config, SIMFLOW_CONTEXT.proctime, tier="hit"),
     benchmark:
         patterns.benchmark_filename(config, tier="hit")
     script:
@@ -61,12 +61,12 @@ rule build_hpge_drift_time_map:
     output:
         temp(patterns.output_dtmap_filename(config)),
     log:
-        patterns.log_dtmap_filename(config, proctime),
+        patterns.log_dtmap_filename(config, SIMFLOW_CONTEXT.proctime),
     threads: 1
     params:
         metadata_path=config.paths.metadata,
     conda:
-        f"{basedir}/envs/julia.yaml"
+        f"{SIMFLOW_CONTEXT.basedir}/envs/julia.yaml"
     # NOTE: not using the `script` directive here since Snakemake has no nice
     # way to handle package dependencies nor Project.toml
     shell:
@@ -92,7 +92,7 @@ rule merge_hpge_drift_time_maps:
     params:
         input_regex=patterns.output_dtmap_filename(config, hpge_detector="*"),
     conda:
-        f"{basedir}/envs/julia.yaml"
+        f"{SIMFLOW_CONTEXT.basedir}/envs/julia.yaml"
     shell:
         r"""
         shopt -s nullglob

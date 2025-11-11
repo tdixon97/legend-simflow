@@ -1,4 +1,4 @@
-experiment: l200p03
+experiment: l200p15
 
 # runlist:
 # - l200-p03-r000-phy
@@ -38,10 +38,10 @@ paths:
   geom: $_/generated/geom
   dtmaps: $_/generated/dtmaps
   tier_evt: $_/generated/tier/evt
-  tier_hit: ./generated/tier/hit
+  tier_hit: $_/generated/tier/hit
   tier_pdf: $_/generated/tier/pdf
-  tier_stp: ./generated/tier/stp
-  tier_ver: ./generated/tier/ver
+  tier_stp: $_/generated/tier/stp
+  tier_ver: $_/generated/tier/ver
   pdf_releases: $_/generated/releases
   plots: $_/generated/plots
 #
