@@ -16,20 +16,26 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Iterable
+from pathlib import Path
 
 from dbetto import AttrsDict
 from legendmeta.police import validate_dict_schema
 
-from . import SimflowConfig, patterns, utils
+from . import SimflowConfig, patterns
 from .exceptions import SimflowConfigError
 from .utils import get_simconfig
 
 log = logging.getLogger(__name__)
 
 
-def get_simid_njobs(config: SimflowConfig, tier, simid):
-    """Returns the number of macros that will be generated for a given `tier`
-    and `simid`."""
+def get_simid_njobs(config: SimflowConfig, tier: str, simid: str) -> int:
+    """Number of jobs that will be generated for a `tier.simid`.
+
+    This works only for the `ver` and `stp` tiers.  If ``config.benchmark`` is
+    true, this function always returns 1. If vertices files are selected as
+    input, will return the length of such list.
+    """
     if tier not in ("ver", "stp"):
         tier = "stp"
 
@@ -45,21 +51,26 @@ def get_simid_njobs(config: SimflowConfig, tier, simid):
     return get_simconfig(config, tier, simid=simid, field="number_of_jobs")
 
 
-def gen_list_of_simid_inputs(config: SimflowConfig, tier, simid):
-    """Generates the full list of input files for a `tier` and `simid`."""
+def gen_list_of_simid_inputs(
+    config: SimflowConfig, tier: str, simid: str
+) -> list[Path]:
+    """Generate the list of input files for a `tier.simid`."""
     n_jobs = get_simid_njobs(config, tier, simid)
     return patterns.input_simid_filenames(config, n_jobs, tier=tier, simid=simid)
 
 
-def gen_list_of_simid_outputs(config: SimflowConfig, tier, simid, max_files=None):
-    """Generates the full list of output files for a `simid`."""
+def gen_list_of_simid_outputs(
+    config: SimflowConfig, tier: str, simid: str, max_files: int | None = None
+) -> list[Path]:
+    """Generate the list of output files for a `tier.simid`."""
     n_jobs = get_simid_njobs(config, tier, simid)
     if max_files is not None:
         n_jobs = min(n_jobs, max_files)
     return patterns.output_simid_filenames(config, n_jobs, tier=tier, simid=simid)
 
 
-def gen_list_of_plots_outputs(config: SimflowConfig, tier, simid):
+def gen_list_of_plots_outputs(config: SimflowConfig, tier: str, simid: str):
+    """Generate the list of plots files for a `tier.simid`."""
     if tier == "stp":
         return [
             patterns.plots_filepath(config, tier=tier, simid=simid)
@@ -71,27 +82,33 @@ def gen_list_of_plots_outputs(config: SimflowConfig, tier, simid):
 # simid independent stuff
 
 
-def get_runlist(config: SimflowConfig):
-    return sorted(utils.get_some_list(config.runlist))
+def get_runlist(config: SimflowConfig) -> list[str]:
+    """Sanitized sorted list of runs from the simflow `config`."""
+    field = config.runlist
+
+    # Get a list, whether it's in a file or directly specified
+    if isinstance(field, str):
+        if Path(field).is_file():
+            with Path(field).open() as f:
+                slist = [line.rstrip() for line in f.readlines()]
+        else:
+            slist = [field]
+    elif isinstance(field, list):
+        slist = field
+
+    return sorted(slist)
 
 
-def collect_simconfigs(config: SimflowConfig, tiers):
-    cfgs = []
-    for tier in tiers:
-        for sid in get_simconfig(config, tier):
-            cfgs.append((tier, sid))
-
-    return cfgs
-
-
-def gen_list_of_all_simids(config: SimflowConfig, tier):
+def gen_list_of_all_simids(config: SimflowConfig, tier: str) -> list[str]:
+    r"""Generate a list of all `simid`\ s that belong to a `tier`."""
     if tier not in ("ver", "stp"):
         tier = "stp"
 
     return get_simconfig(config, tier).keys()
 
 
-def gen_list_of_all_simid_outputs(config: SimflowConfig, tier):
+def gen_list_of_all_simid_outputs(config: SimflowConfig, tier: str) -> list[Path]:
+    r"""Generate a list of all files that belong to a `tier`."""
     mlist = []
     slist = gen_list_of_all_simids(config, tier)
     for simid in slist:
@@ -100,7 +117,8 @@ def gen_list_of_all_simid_outputs(config: SimflowConfig, tier):
     return mlist
 
 
-def gen_list_of_all_plots_outputs(config: SimflowConfig, tier):
+def gen_list_of_all_plots_outputs(config: SimflowConfig, tier: str) -> list[Path]:
+    r"""Generate a list of all plot files that belong to a `tier`."""
     mlist = []
     for simid in gen_list_of_all_simids(config, tier):
         mlist += gen_list_of_plots_outputs(config, tier, simid)
@@ -217,7 +235,26 @@ def gen_list_of_all_tier_pdf_outputs(config: SimflowConfig):
     return mlist
 
 
-def process_simlist(config: SimflowConfig, simlist=None):
+def process_simlist(
+    config: SimflowConfig, simlist: Iterable[str] | None = None
+) -> list[Path]:
+    """Produce a list of all output files that refer to a `simlist`
+
+    A "simlist" is a list of strings of the format ``<tier>.<simid>``, used to
+    instruct the Simflow about which tiers and simulations it should process.
+    The simlist should be specified as a field in `config`, located at
+    `config.simlist`.
+
+    This function returns the list of all files that the Simflow has to produce
+    for all identifiers.
+
+    Parameters
+    ----------
+    config
+        :class:`SimflowConfig` object.
+    simlist
+        supply the simlist, if not present in `config`.
+    """
     if simlist is None:
         simlist = config.simlist
 

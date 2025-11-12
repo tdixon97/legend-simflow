@@ -65,20 +65,6 @@ def init_simflow_context(raw_config: dict, workflow) -> AttrsDict:
     )
 
 
-def get_some_list(field: str | list) -> list:
-    """Get a list, whether it's in a file or directly specified."""
-    if isinstance(field, str):
-        if Path(field).is_file():
-            with Path(field).open() as f:
-                slist = [line.rstrip() for line in f.readlines()]
-        else:
-            slist = [field]
-    elif isinstance(field, list):
-        slist = field
-
-    return slist
-
-
 def get_simconfig(
     config: SimflowConfig,
     tier: str,

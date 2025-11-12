@@ -30,9 +30,6 @@ def test_simid_harvesting(config):
     assert isinstance(simids, type({}.keys()))
     assert all(isinstance(s, str) for s in simids)
 
-    simcfgs = agg.collect_simconfigs(config, ["stp"])
-    assert len(simcfgs) == 6
-
 
 def test_simid_outputs(config):
     outputs = agg.gen_list_of_all_simid_outputs(config, "stp")
