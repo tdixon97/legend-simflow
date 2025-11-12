@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 import shlex
-from collections.abc import Mapping
 from pathlib import Path
 
 import legenddataflowscripts as lds
 import numpy as np
 
-from . import patterns
+from . import SimflowConfig, patterns
 from .exceptions import SimflowConfigError
 from .utils import get_simconfig
 
 
 def remage_run(
-    config: Mapping,
+    config: SimflowConfig,
     simid: str,
     tier: str = "stp",
     geom: str | Path = "{input.geom}",
@@ -139,7 +138,9 @@ def remage_run(
     return shlex.join(cmd)
 
 
-def make_remage_macro(config: Mapping, simid: str, tier: str = "stp") -> (str, Path):
+def make_remage_macro(
+    config: SimflowConfig, simid: str, tier: str = "stp"
+) -> (str, Path):
     """Render the remage macro for a given simulation and write it to disk.
 
     This function reads the simulation configuration for the provided tier/simid,

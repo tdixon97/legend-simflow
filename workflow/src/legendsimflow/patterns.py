@@ -35,7 +35,7 @@ from pathlib import Path
 
 from snakemake.io import expand
 
-from . import utils
+from . import SimflowConfig, utils
 
 
 def _expand(pattern: str | Path, keep_list: bool = False, **kwargs) -> str | Path:
@@ -53,12 +53,12 @@ def _expand(pattern: str | Path, keep_list: bool = False, **kwargs) -> str | Pat
     return exp
 
 
-def simjob_base_segment(config, **kwargs) -> str:
+def simjob_base_segment(config: SimflowConfig, **kwargs) -> str:
     """Formats a partial output path for a `simid` and `jobid`."""
     return _expand("{simid}/" + config.experiment + "-{simid}_{jobid}", **kwargs)
 
 
-def log_filename(config, time: str, **kwargs) -> Path:
+def log_filename(config: SimflowConfig, time: str, **kwargs) -> Path:
     """Formats a log file path for a `simid` and `jobid`."""
     pat = (
         Path(config.paths.log)
@@ -69,7 +69,7 @@ def log_filename(config, time: str, **kwargs) -> Path:
     return _expand(pat, **kwargs)
 
 
-def benchmark_filename(config, **kwargs) -> Path:
+def benchmark_filename(config: SimflowConfig, **kwargs) -> Path:
     """Formats a benchmark file path for a `simid` and `jobid`."""
     pat = (
         Path(config.paths.benchmarks)
@@ -79,7 +79,7 @@ def benchmark_filename(config, **kwargs) -> Path:
     return _expand(pat, **kwargs)
 
 
-def plots_dirname(config, **kwargs) -> Path:
+def plots_dirname(config: SimflowConfig, **kwargs) -> Path:
     """Formats the plots directory path for a `simid` and `tier`."""
     return _expand(Path(config.paths.plots) / "{tier}" / "{simid}", **kwargs)
 
@@ -87,21 +87,21 @@ def plots_dirname(config, **kwargs) -> Path:
 # geometry
 
 
-def geom_config_filename(config, **kwargs) -> Path:
+def geom_config_filename(config: SimflowConfig, **kwargs) -> Path:
     pat = Path(config.paths.geom) / (
         config.experiment + "-{simid}-tier_{tier}-geom-config.yaml"
     )
     return _expand(pat, **kwargs)
 
 
-def geom_gdml_filename(config, **kwargs) -> Path:
+def geom_gdml_filename(config: SimflowConfig, **kwargs) -> Path:
     pat = Path(config.paths.geom) / (
         config.experiment + "-{simid}-tier_{tier}-geom.gdml"
     )
     return _expand(pat, **kwargs)
 
 
-def geom_log_filename(config, time: str, **kwargs) -> str:
+def geom_log_filename(config: SimflowConfig, time: str, **kwargs) -> str:
     pat = (
         Path(config.paths.log)
         / time
@@ -114,7 +114,7 @@ def geom_log_filename(config, time: str, **kwargs) -> str:
 # ver, stp, hit tiers
 
 
-def input_simjob_filename(config, **kwargs) -> Path:
+def input_simjob_filename(config: SimflowConfig, **kwargs) -> Path:
     """Returns the full path to the input file for a `simid`, `tier` and job index."""
     tier = kwargs.get("tier")
 
@@ -127,7 +127,7 @@ def input_simjob_filename(config, **kwargs) -> Path:
     return _expand(Path(config.paths.macros) / f"{tier}" / fname, **kwargs)
 
 
-def output_simjob_filename(config, **kwargs) -> Path:
+def output_simjob_filename(config: SimflowConfig, **kwargs) -> Path:
     """Returns the full path to the output file for a `simid`, `tier` and job index."""
     tier = kwargs.get("tier")
 
@@ -139,7 +139,7 @@ def output_simjob_filename(config, **kwargs) -> Path:
     return _expand(Path(config.paths[f"tier_{tier}"]) / fname, **kwargs)
 
 
-def output_simjob_regex(config, **kwargs) -> str:
+def output_simjob_regex(config: SimflowConfig, **kwargs) -> str:
     tier = kwargs.get("tier")
 
     if tier is None:
@@ -151,7 +151,7 @@ def output_simjob_regex(config, **kwargs) -> str:
     return _expand(expr, **kwargs)
 
 
-def input_simid_filenames(config, n_macros, **kwargs) -> list[Path]:
+def input_simid_filenames(config: SimflowConfig, n_macros, **kwargs) -> list[Path]:
     """Returns the full path to `n_macros` input files for a `simid`. Needed by
     script that generates all macros for a `simid`.
     """
@@ -160,14 +160,14 @@ def input_simid_filenames(config, n_macros, **kwargs) -> list[Path]:
     return _expand(pat, jobid=jobids, keep_list=True, **kwargs)
 
 
-def output_simid_filenames(config, n_macros, **kwargs):
+def output_simid_filenames(config: SimflowConfig, n_macros, **kwargs):
     """Returns the full path to `n_macros` output files for a `simid`."""
     pat = output_simjob_filename(config, **kwargs)
     jobids = expand("{id:>04d}", id=list(range(n_macros)))
     return _expand(pat, jobid=jobids, keep_list=True, **kwargs)
 
 
-def ver_filename_for_stp(config, simid: str) -> Path | list:
+def ver_filename_for_stp(config: SimflowConfig, simid: str) -> Path | list:
     """Returns the vertices file needed for the 'stp' tier job, if needed. Used
     as lambda function in the `build_tier_stp` Snakemake rule."""
     sconfig = utils.get_simconfig(config, "stp", simid)
@@ -179,17 +179,17 @@ def ver_filename_for_stp(config, simid: str) -> Path | list:
 # drift time maps
 
 
-def output_dtmap_filename(config, **kwargs) -> Path:
+def output_dtmap_filename(config: SimflowConfig, **kwargs) -> Path:
     pat = Path(config.paths.dtmaps) / "{runid}-{hpge_detector}-hpge-drift-time-map.lh5"
     return _expand(pat, **kwargs)
 
 
-def output_dtmap_merged_filename(config, **kwargs) -> Path:
+def output_dtmap_merged_filename(config: SimflowConfig, **kwargs) -> Path:
     pat = Path(config.paths.dtmaps) / "{runid}-hpge-drift-time-maps.lh5"
     return _expand(pat, **kwargs)
 
 
-def log_dtmap_filename(config, time: str, **kwargs) -> Path:
+def log_dtmap_filename(config: SimflowConfig, time: str, **kwargs) -> Path:
     pat = (
         Path(config.paths.log)
         / time
@@ -206,19 +206,19 @@ def evtfile_rel_basename(**kwargs):
     return expand("{simid}/{simid}_{runid}-tier_evt", **kwargs, allow_missing=True)[0]
 
 
-def output_evt_filename(config, **kwargs):
+def output_evt_filename(config: SimflowConfig, **kwargs):
     expr = str(Path(config["paths"]["tier_evt"]) / (evtfile_rel_basename() + ".lh5"))
     return expand(expr, **kwargs, allow_missing=True)[0]
 
 
-def log_evtfile_path(config, time, **kwargs):
+def log_evtfile_path(config: SimflowConfig, time, **kwargs):
     pat = str(
         Path(config["paths"]["log"]) / time, "evt" / (evtfile_rel_basename() + ".log")
     )
     return expand(pat, **kwargs, allow_missing=True)[0]
 
 
-def benchmark_evtfile_path(config, **kwargs):
+def benchmark_evtfile_path(config: SimflowConfig, **kwargs):
     pat = str(
         Path(config["paths"]["benchmarks"]) / "evt" / (evtfile_rel_basename() + ".tsv")
     )
@@ -232,19 +232,19 @@ def pdffile_rel_basename(**kwargs):
     return expand("{simid}/{simid}-tier_pdf", **kwargs, allow_missing=True)[0]
 
 
-def output_pdf_filename(config, **kwargs):
+def output_pdf_filename(config: SimflowConfig, **kwargs):
     expr = str(Path(config["paths"]["tier_pdf"]) / (pdffile_rel_basename() + ".lh5"))
     return expand(expr, **kwargs, allow_missing=True)[0]
 
 
-def log_pdffile_path(config, time, **kwargs):
+def log_pdffile_path(config: SimflowConfig, time, **kwargs):
     pat = str(
         Path(config["paths"]["log"]) / time / "pdf" / (pdffile_rel_basename() + ".log")
     )
     return expand(pat, **kwargs, allow_missing=True)[0]
 
 
-def benchmark_pdffile_path(config, **kwargs):
+def benchmark_pdffile_path(config: SimflowConfig, **kwargs):
     pat = str(
         Path(config["paths"]["benchmarks"]) / "pdf" / (pdffile_rel_basename() + ".tsv")
     )

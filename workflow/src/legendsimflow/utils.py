@@ -22,6 +22,7 @@ from pathlib import Path
 from dbetto import AttrsDict
 from snakemake.io import Wildcards
 
+from . import SimflowConfig
 from .exceptions import SimflowConfigError
 
 
@@ -40,7 +41,7 @@ def get_some_list(field: str | list) -> list:
 
 
 def get_simconfig(
-    config: AttrsDict,
+    config: SimflowConfig,
     tier: str,
     simid: str | None = None,
     field: str | None = None,
@@ -91,7 +92,7 @@ def hash_dict(d):
 
 
 def smk_hash_simconfig(
-    config: AttrsDict,
+    config: SimflowConfig,
     wildcards: Wildcards,
     field: str | None = None,
     ignore: list | None = None,
@@ -131,7 +132,7 @@ def smk_hash_simconfig(
     return hash_dict(scfg)
 
 
-def setup_logdir_link(config, proctime):
+def setup_logdir_link(config: SimflowConfig, proctime):
     logdir = Path(config.paths.log)
     logdir.mkdir(parents=True, exist_ok=True)
 

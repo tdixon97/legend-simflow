@@ -20,14 +20,14 @@ import logging
 from dbetto import AttrsDict
 from legendmeta.police import validate_dict_schema
 
-from . import patterns, utils
+from . import SimflowConfig, patterns, utils
 from .exceptions import SimflowConfigError
 from .utils import get_simconfig
 
 log = logging.getLogger(__name__)
 
 
-def get_simid_njobs(config, tier, simid):
+def get_simid_njobs(config: SimflowConfig, tier, simid):
     """Returns the number of macros that will be generated for a given `tier`
     and `simid`."""
     if tier not in ("ver", "stp"):
@@ -45,13 +45,13 @@ def get_simid_njobs(config, tier, simid):
     return get_simconfig(config, tier, simid=simid, field="number_of_jobs")
 
 
-def gen_list_of_simid_inputs(config, tier, simid):
+def gen_list_of_simid_inputs(config: SimflowConfig, tier, simid):
     """Generates the full list of input files for a `tier` and `simid`."""
     n_jobs = get_simid_njobs(config, tier, simid)
     return patterns.input_simid_filenames(config, n_jobs, tier=tier, simid=simid)
 
 
-def gen_list_of_simid_outputs(config, tier, simid, max_files=None):
+def gen_list_of_simid_outputs(config: SimflowConfig, tier, simid, max_files=None):
     """Generates the full list of output files for a `simid`."""
     n_jobs = get_simid_njobs(config, tier, simid)
     if max_files is not None:
@@ -59,7 +59,7 @@ def gen_list_of_simid_outputs(config, tier, simid, max_files=None):
     return patterns.output_simid_filenames(config, n_jobs, tier=tier, simid=simid)
 
 
-def gen_list_of_plots_outputs(config, tier, simid):
+def gen_list_of_plots_outputs(config: SimflowConfig, tier, simid):
     if tier == "stp":
         return [
             patterns.plots_filepath(config, tier=tier, simid=simid)
@@ -71,11 +71,11 @@ def gen_list_of_plots_outputs(config, tier, simid):
 # simid independent stuff
 
 
-def get_runlist(config):
+def get_runlist(config: SimflowConfig):
     return sorted(utils.get_some_list(config.runlist))
 
 
-def collect_simconfigs(config, tiers):
+def collect_simconfigs(config: SimflowConfig, tiers):
     cfgs = []
     for tier in tiers:
         for sid in get_simconfig(config, tier):
@@ -84,14 +84,14 @@ def collect_simconfigs(config, tiers):
     return cfgs
 
 
-def gen_list_of_all_simids(config, tier):
+def gen_list_of_all_simids(config: SimflowConfig, tier):
     if tier not in ("ver", "stp"):
         tier = "stp"
 
     return get_simconfig(config, tier).keys()
 
 
-def gen_list_of_all_simid_outputs(config, tier):
+def gen_list_of_all_simid_outputs(config: SimflowConfig, tier):
     mlist = []
     slist = gen_list_of_all_simids(config, tier)
     for simid in slist:
@@ -100,7 +100,7 @@ def gen_list_of_all_simid_outputs(config, tier):
     return mlist
 
 
-def gen_list_of_all_plots_outputs(config, tier):
+def gen_list_of_all_plots_outputs(config: SimflowConfig, tier):
     mlist = []
     for simid in gen_list_of_all_simids(config, tier):
         mlist += gen_list_of_plots_outputs(config, tier, simid)
@@ -111,7 +111,7 @@ def gen_list_of_all_plots_outputs(config, tier):
 # drift time maps
 
 
-def crystal_meta(config: AttrsDict, diode_meta: AttrsDict) -> AttrsDict:
+def crystal_meta(config: SimflowConfig, diode_meta: AttrsDict) -> AttrsDict:
     """Get the crystal metadata starting from the diode metadata."""
     ids = {"bege": "B", "coax": "C", "ppc": "P", "icpc": "V"}
     crystal_name = (
@@ -125,13 +125,13 @@ def crystal_meta(config: AttrsDict, diode_meta: AttrsDict) -> AttrsDict:
     return None
 
 
-def start_key(config: AttrsDict, runid: str) -> str:
+def start_key(config: SimflowConfig, runid: str) -> str:
     """Get the start key for a runid."""
     _, period, run, datatype = runid.split("-")
     return config.metadata.datasets.runinfo[period][run][datatype].start_key
 
 
-def gen_list_of_hpges_valid_for_dtmap(config: AttrsDict, runid: str) -> list[str]:
+def gen_list_of_hpges_valid_for_dtmap(config: SimflowConfig, runid: str) -> list[str]:
     """Make a list of HPGe detector for which we want to generate a drift time map.
 
     It generates the list of deployed detectors in `runid` via the LEGEND
@@ -165,7 +165,7 @@ def gen_list_of_hpges_valid_for_dtmap(config: AttrsDict, runid: str) -> list[str
     return hpges
 
 
-def gen_list_of_dtmaps(config: AttrsDict, runid: str) -> list[str]:
+def gen_list_of_dtmaps(config: SimflowConfig, runid: str) -> list[str]:
     """Generate the list of HPGe drift time map files for a `runid`."""
     hpges = gen_list_of_hpges_valid_for_dtmap(config, runid)
     return [
@@ -174,7 +174,7 @@ def gen_list_of_dtmaps(config: AttrsDict, runid: str) -> list[str]:
     ]
 
 
-def gen_list_of_merged_dtmaps(config: AttrsDict) -> list[str]:
+def gen_list_of_merged_dtmaps(config: SimflowConfig) -> list[str]:
     r"""Generate the list of (merged) HPGe drift time map files for all requested `runid`\ s."""
     return [
         patterns.output_dtmap_merged_filename(config, runid=runid)
@@ -185,7 +185,7 @@ def gen_list_of_merged_dtmaps(config: AttrsDict) -> list[str]:
 # evt tier
 
 
-def gen_list_of_tier_evt_outputs(config, simid):
+def gen_list_of_tier_evt_outputs(config: SimflowConfig, simid):
     mlist = []
     for runid in get_runlist(config):
         mlist += [patterns.output_evt_filename(config, simid=simid, runid=runid)]
@@ -193,7 +193,7 @@ def gen_list_of_tier_evt_outputs(config, simid):
     return mlist
 
 
-def gen_list_of_all_tier_evt_outputs(config):
+def gen_list_of_all_tier_evt_outputs(config: SimflowConfig):
     mlist = []
     slist = gen_list_of_all_simids(config, tier="stp")
     for sid in slist:
@@ -205,11 +205,11 @@ def gen_list_of_all_tier_evt_outputs(config):
 # pdf tier
 
 
-def gen_list_of_tier_pdf_outputs(config, simid):
+def gen_list_of_tier_pdf_outputs(config: SimflowConfig, simid):
     return [patterns.output_pdf_filename(config, simid=simid)]
 
 
-def gen_list_of_all_tier_pdf_outputs(config):
+def gen_list_of_all_tier_pdf_outputs(config: SimflowConfig):
     mlist = []
     slist = gen_list_of_all_simids(config, tier="stp")
     for simid in slist:
@@ -217,7 +217,7 @@ def gen_list_of_all_tier_pdf_outputs(config):
     return mlist
 
 
-def process_simlist(config, simlist=None):
+def process_simlist(config: SimflowConfig, simlist=None):
     if simlist is None:
         simlist = config.simlist
 
