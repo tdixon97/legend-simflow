@@ -53,9 +53,13 @@ def _expand(pattern: str | Path, keep_list: bool = False, **kwargs) -> str | Pat
     return exp
 
 
-def simjob_rel_basename(config, **kwargs) -> str:
+def simjob_base_segment(config, **kwargs) -> str:
     """Formats a partial output path for a `simid` and `jobid`."""
     return _expand("{simid}/" + config.experiment + "-{simid}_{jobid}", **kwargs)
+
+
+# Backward compatibility alias (to be removed in a future release)
+simjob_rel_basename = simjob_base_segment
 
 
 def log_filename(config, time: str, **kwargs) -> Path:
@@ -64,7 +68,7 @@ def log_filename(config, time: str, **kwargs) -> Path:
         Path(config.paths.log)
         / time
         / "{tier}"
-        / (simjob_rel_basename(config) + "-tier_{tier}.log")
+        / (simjob_base_segment(config) + "-tier_{tier}.log")
     )
     return _expand(pat, **kwargs)
 
@@ -74,7 +78,7 @@ def benchmark_filename(config, **kwargs) -> Path:
     pat = (
         Path(config.paths.benchmarks)
         / "{tier}"
-        / (simjob_rel_basename(config) + "-tier_{tier}.tsv")
+        / (simjob_base_segment(config) + "-tier_{tier}.tsv")
     )
     return _expand(pat, **kwargs)
 
@@ -135,7 +139,7 @@ def output_simjob_filename(config, **kwargs) -> Path:
         msg = "the 'tier' argument is mandatory"
         raise RuntimeError(msg)
 
-    fname = simjob_rel_basename(config) + f"-tier_{tier}.lh5"
+    fname = simjob_base_segment(config) + f"-tier_{tier}.lh5"
     return _expand(Path(config.paths[f"tier_{tier}"]) / fname, **kwargs)
 
 
