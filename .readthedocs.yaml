@@ -17,6 +17,7 @@ build:
       --force
       --output-dir docs/source/api
       workflow/src
+      workflow/src/legendsimflow/scripts/*
     - python docs/tools/generate_rule_docs.py
     - .venv/bin/python -m sphinx -T -b html -d docs/_build/doctrees -D
       language=en docs/source $READTHEDOCS_OUTPUT/html
