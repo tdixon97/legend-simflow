@@ -25,9 +25,6 @@ Definitions:
 - ``simjob``: one job of a simulation run (corresponds to one macro file and one output file)
 - ``jobid``: zero-padded integer (i.e., a string) used to label a simulation job
 """
-# TODO:
-# - use coherent naming
-# - use attribute access everywhere
 
 from __future__ import annotations
 
@@ -54,7 +51,7 @@ def _expand(pattern: str | Path, keep_list: bool = False, **kwargs) -> str | Pat
 
 
 def simjob_base_segment(config: SimflowConfig, **kwargs) -> str:
-    """Formats a partial output path for a `simid` and `jobid`."""
+    """Formats a segment for a path including wildcards `simid` and `jobid`."""
     return _expand("{simid}/" + config.experiment + "-{simid}_{jobid}", **kwargs)
 
 

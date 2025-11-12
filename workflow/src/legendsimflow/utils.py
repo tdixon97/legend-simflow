@@ -17,13 +17,41 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime
 from pathlib import Path
 
+import legenddataflowscripts as ldfs
 from dbetto import AttrsDict
+from legendmeta import LegendMetadata
 from snakemake.io import Wildcards
 
 from . import SimflowConfig
 from .exceptions import SimflowConfigError
+
+
+def init_simflow_context(raw_config: dict, workflow) -> AttrsDict:
+    if not raw_config:
+        msg = "you must set a config file with --configfile"
+        raise RuntimeError(msg)
+
+    raw_config.setdefault("benchmark", {"enabled": False})
+    ldfs.workflow.utils.subst_vars_in_snakemake_config(workflow, raw_config)
+    config = AttrsDict(raw_config)
+
+    # NOTE: this will attempt a clone of legend-metadata, if the directory does not exist
+    # NOTE: don't use lazy=True, we need a fully functional TextDB
+    metadata = LegendMetadata(config.paths.metadata)
+    if "legend_metadata_version" in config:
+        metadata.checkout(config.legend_metadata_version)
+    config["metadata"] = metadata
+
+    return AttrsDict(
+        {
+            "config": config,
+            "basedir": workflow.basedir,
+            "proctime": datetime.now().strftime("%Y%m%dT%H%M%SZ"),
+        }
+    )
 
 
 def get_some_list(field: str | list) -> list:

@@ -18,33 +18,11 @@ from datetime import datetime
 
 from dbetto import AttrsDict
 
-import legenddataflowscripts as ldfs
-from legendsimflow import patterns, aggregate, tier_evt, utils
-from legendmeta import LegendMetadata
+from legendsimflow import aggregate, utils
 
 
-# prepare simflow configuration file
-if not config:
-    raise RuntimeError("you must set a config file with --configfile")
-
-config.setdefault("benchmark", {"enabled": False})
-ldfs.workflow.utils.subst_vars_in_snakemake_config(workflow, config)
-config = AttrsDict(config)
-
-# NOTE: this will attempt a clone of legend-metadata, if the directory does not exist
-# NOTE: don't use lazy=True, we need a fully functional TextDB
-_metadata = LegendMetadata(config.paths.metadata)
-if "legend_metadata_version" in config:
-    _metadata.checkout(config.legend_metadata_version)
-config["metadata"] = _metadata
-
-SIMFLOW_CONTEXT = AttrsDict(
-    {
-        "config": config,
-        "basedir": workflow.basedir,
-        "proctime": datetime.now().strftime("%Y%m%dT%H%M%SZ"),
-    }
-)
+SIMFLOW_CONTEXT = utils.init_simflow_context(config, workflow)
+config = SIMFLOW_CONTEXT.config
 
 
 conda: f"{SIMFLOW_CONTEXT.basedir}/envs/global.yaml"

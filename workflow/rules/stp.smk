@@ -15,7 +15,7 @@
 
 """Rules to build the `stp` tier."""
 
-from legendsimflow import aggregate, commands, utils
+from legendsimflow import aggregate, commands, utils, patterns
 
 
 rule gen_all_tier_stp:
