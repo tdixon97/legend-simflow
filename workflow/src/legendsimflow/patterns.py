@@ -33,27 +33,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from dbetto import AttrsDict
 from snakemake.io import expand
-
-FILETYPES = AttrsDict(
-    {
-        "input": {
-            "ver": ".mac",
-            "stp": ".mac",
-            "hit": ".lh5",
-            "evt": ".lh5",
-            "pdf": ".lh5",
-        },
-        "output": {
-            "ver": ".lh5",
-            "stp": ".lh5",
-            "hit": ".lh5",
-            "evt": ".lh5",
-            "pdf": ".lh5",
-        },
-    }
-)
 
 
 def simjob_rel_basename(config, **kwargs):
@@ -131,7 +111,8 @@ def input_simjob_filename(config, **kwargs):
         msg = "the 'tier' argument is mandatory"
         raise RuntimeError(msg)
 
-    fname = config.experiment + "-{simid}" + f"-tier_{tier}" + FILETYPES["input"][tier]
+    ext = ".mac" if tier in ("ver", "stp") else ".lh5"
+    fname = config.experiment + "-{simid}" + f"-tier_{tier}" + ext
     expr = str(Path(config.paths.macros) / f"{tier}" / fname)
     return expand(expr, **kwargs, allow_missing=True)[0]
 
@@ -144,7 +125,7 @@ def output_simjob_filename(config, **kwargs):
         msg = "the 'tier' argument is mandatory"
         raise RuntimeError(msg)
 
-    fname = simjob_rel_basename(config) + f"-tier_{tier}" + FILETYPES["output"][tier]
+    fname = simjob_rel_basename(config) + f"-tier_{tier}.lh5"
     expr = str(Path(config.paths[f"tier_{tier}"]) / fname)
     return expand(expr, **kwargs, allow_missing=True)[0]
 
@@ -156,7 +137,7 @@ def output_simjob_regex(config, **kwargs):
         msg = "the 'tier' argument is mandatory"
         raise RuntimeError(msg)
 
-    fname = config.experiment + "-*-tier_{tier}" + FILETYPES["output"][tier]
+    fname = config.experiment + "-*-tier_{tier}.lh5"
     expr = str(Path(config["paths"][f"tier_{tier}"]) / "{simid}" / fname)
     return expand(expr, **kwargs, allow_missing=True)[0]
 
@@ -219,10 +200,7 @@ def evtfile_rel_basename(**kwargs):
 
 
 def output_evt_filename(config, **kwargs):
-    expr = str(
-        Path(config["paths"]["tier_evt"])
-        / (evtfile_rel_basename() + FILETYPES["output"]["evt"])
-    )
+    expr = str(Path(config["paths"]["tier_evt"]) / (evtfile_rel_basename() + ".lh5"))
     return expand(expr, **kwargs, allow_missing=True)[0]
 
 
@@ -248,10 +226,7 @@ def pdffile_rel_basename(**kwargs):
 
 
 def output_pdf_filename(config, **kwargs):
-    expr = str(
-        Path(config["paths"]["tier_pdf"])
-        / (pdffile_rel_basename() + FILETYPES["output"]["pdf"])
-    )
+    expr = str(Path(config["paths"]["tier_pdf"]) / (pdffile_rel_basename() + ".lh5"))
     return expand(expr, **kwargs, allow_missing=True)[0]
 
 
