@@ -10,7 +10,7 @@ rule build_tier_hit:
         "Producing output file for job hit.{wildcards.simid}.{wildcards.jobid}"
     input:
         geom=patterns.geom_gdml_filename(config, tier="stp"),
-        stp_file=patterns.output_simjob_filename(config, tier="stp"),
+        stp_file=rules.build_tier_stp.output,
         optmap_lar=config.paths.optical_maps.lar,
         hpge_dtmaps=aggregate.gen_list_of_merged_dtmaps(config),
     output:
