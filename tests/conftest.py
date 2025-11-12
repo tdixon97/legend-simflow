@@ -33,6 +33,17 @@ def make_config(legend_testdata):
     legenddataflowscripts.subst_vars(config, var_values={"_": testprod})
     assert config is not None
 
+    # convert all strings in the "paths" block to pathlib.Path
+    def _make_path(d):
+        for k, v in d.items():
+            if isinstance(v, str):
+                d[k] = Path(v)
+            else:
+                d[k] = _make_path(v)
+        return d
+
+    config["paths"] = _make_path(config["paths"])
+
     for fd in ("hardware", "datasets"):
         shutil.copytree(
             legend_testdata[f"legend/metadata/{fd}"],

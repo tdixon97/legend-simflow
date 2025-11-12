@@ -58,7 +58,7 @@ def simjob_base_segment(config: SimflowConfig, **kwargs) -> str:
 def log_filename(config: SimflowConfig, time: str, **kwargs) -> Path:
     """Formats a log file path for a `simid` and `jobid`."""
     pat = (
-        Path(config.paths.log)
+        config.paths.log
         / time
         / "{tier}"
         / (simjob_base_segment(config) + "-tier_{tier}.log")
@@ -69,7 +69,7 @@ def log_filename(config: SimflowConfig, time: str, **kwargs) -> Path:
 def benchmark_filename(config: SimflowConfig, **kwargs) -> Path:
     """Formats a benchmark file path for a `simid` and `jobid`."""
     pat = (
-        Path(config.paths.benchmarks)
+        config.paths.benchmarks
         / "{tier}"
         / (simjob_base_segment(config) + "-tier_{tier}.tsv")
     )
@@ -78,29 +78,27 @@ def benchmark_filename(config: SimflowConfig, **kwargs) -> Path:
 
 def plots_dirname(config: SimflowConfig, **kwargs) -> Path:
     """Formats the plots directory path for a `simid` and `tier`."""
-    return _expand(Path(config.paths.plots) / "{tier}" / "{simid}", **kwargs)
+    return _expand(config.paths.plots / "{tier}" / "{simid}", **kwargs)
 
 
 # geometry
 
 
 def geom_config_filename(config: SimflowConfig, **kwargs) -> Path:
-    pat = Path(config.paths.geom) / (
+    pat = config.paths.geom / (
         config.experiment + "-{simid}-tier_{tier}-geom-config.yaml"
     )
     return _expand(pat, **kwargs)
 
 
 def geom_gdml_filename(config: SimflowConfig, **kwargs) -> Path:
-    pat = Path(config.paths.geom) / (
-        config.experiment + "-{simid}-tier_{tier}-geom.gdml"
-    )
+    pat = config.paths.geom / (config.experiment + "-{simid}-tier_{tier}-geom.gdml")
     return _expand(pat, **kwargs)
 
 
 def geom_log_filename(config: SimflowConfig, time: str, **kwargs) -> str:
     pat = (
-        Path(config.paths.log)
+        config.paths.log
         / time
         / "geom"
         / (config.experiment + "-{simid}-tier_{tier}-geom.log")
@@ -121,7 +119,7 @@ def input_simjob_filename(config: SimflowConfig, **kwargs) -> Path:
 
     ext = ".mac" if tier in ("ver", "stp") else ".lh5"
     fname = config.experiment + "-{simid}" + f"-tier_{tier}" + ext
-    return _expand(Path(config.paths.macros) / f"{tier}" / fname, **kwargs)
+    return _expand(config.paths.macros / f"{tier}" / fname, **kwargs)
 
 
 def output_simjob_filename(config: SimflowConfig, **kwargs) -> Path:
@@ -133,7 +131,7 @@ def output_simjob_filename(config: SimflowConfig, **kwargs) -> Path:
         raise RuntimeError(msg)
 
     fname = simjob_base_segment(config) + f"-tier_{tier}.lh5"
-    return _expand(Path(config.paths[f"tier_{tier}"]) / fname, **kwargs)
+    return _expand(config.paths[f"tier_{tier}"] / fname, **kwargs)
 
 
 def output_simjob_regex(config: SimflowConfig, **kwargs) -> str:
@@ -177,18 +175,19 @@ def ver_filename_for_stp(config: SimflowConfig, simid: str) -> Path | list:
 
 
 def output_dtmap_filename(config: SimflowConfig, **kwargs) -> Path:
-    pat = Path(config.paths.dtmaps) / "{runid}-{hpge_detector}-hpge-drift-time-map.lh5"
-    return _expand(pat, **kwargs)
+    return _expand(
+        config.paths.dtmaps / "{runid}-{hpge_detector}-hpge-drift-time-map.lh5",
+        **kwargs,
+    )
 
 
 def output_dtmap_merged_filename(config: SimflowConfig, **kwargs) -> Path:
-    pat = Path(config.paths.dtmaps) / "{runid}-hpge-drift-time-maps.lh5"
-    return _expand(pat, **kwargs)
+    return _expand(config.paths.dtmaps / "{runid}-hpge-drift-time-maps.lh5", **kwargs)
 
 
 def log_dtmap_filename(config: SimflowConfig, time: str, **kwargs) -> Path:
     pat = (
-        Path(config.paths.log)
+        config.paths.log
         / time
         / "hpge_dtmaps"
         / "{runid}-{hpge_detector}-drift-time-map.log"

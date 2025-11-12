@@ -38,6 +38,17 @@ def init_simflow_context(raw_config: dict, workflow) -> AttrsDict:
     ldfs.workflow.utils.subst_vars_in_snakemake_config(workflow, raw_config)
     config = AttrsDict(raw_config)
 
+    # convert all strings in the "paths" block to pathlib.Path
+    def _make_path(d):
+        for k, v in d.items():
+            if isinstance(v, str):
+                d[k] = Path(v)
+            else:
+                d[k] = _make_path(v)
+        return d
+
+    config["paths"] = _make_path(config.paths)
+
     # NOTE: this will attempt a clone of legend-metadata, if the directory does not exist
     # NOTE: don't use lazy=True, we need a fully functional TextDB
     metadata = LegendMetadata(config.paths.metadata)
