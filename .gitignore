@@ -174,3 +174,6 @@ Manifest.toml
 
 # AI
 .aider*
+# pixi environments
+.pixi/*
+!.pixi/config.toml
