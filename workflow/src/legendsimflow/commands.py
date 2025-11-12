@@ -83,7 +83,8 @@ def remage_run(
             if is_benchmark:
                 n_prim_pj = config.benchmark.n_primaries[tier]
     except KeyError as e:
-        raise SimflowConfigError(block, e) from e
+        msg = f"key {e} not found!"
+        raise SimflowConfigError(msg, block) from e
 
     # substitution rules
     cli_subs = {
@@ -191,8 +192,8 @@ def make_remage_macro(config: Mapping, simid: str, tier: str = "stp") -> (str, P
             "~defines:"
         ):
             msg = (
-                f"{block}.generator",
                 "the field must be a string prefixed by ~define:",
+                f"{block}.generator",
             )
             raise SimflowConfigError(*msg)
 
@@ -202,7 +203,8 @@ def make_remage_macro(config: Mapping, simid: str, tier: str = "stp") -> (str, P
                 config.experiment
             ].generators[key]
         except KeyError as e:
-            raise SimflowConfigError(block, e) from e
+            msg = f"key {e} not found!"
+            raise SimflowConfigError(msg, block) from e
 
         if not isinstance(generator, str):
             generator = "\n".join(generator)
@@ -220,7 +222,8 @@ def make_remage_macro(config: Mapping, simid: str, tier: str = "stp") -> (str, P
                         config.experiment
                     ].confinement[key]
                 except KeyError as e:
-                    raise SimflowConfigError(block, e) from e
+                    msg = f"key {e} not found!"
+                    raise SimflowConfigError(msg, block) from e
 
             elif sim_cfg.confinement.startswith(
                 ("~volumes.surface:", "~volumes.bulk:")
@@ -252,11 +255,11 @@ def make_remage_macro(config: Mapping, simid: str, tier: str = "stp") -> (str, P
 
         if confinement is None:
             msg = (
-                f"{block}.confinement",
                 (
                     "the field must be a str or list[str] prefixed by "
                     "~define: / ~volumes.surface: / ~volumes.bulk:"
                 ),
+                f"{block}.confinement",
             )
             raise SimflowConfigError(*msg)
 

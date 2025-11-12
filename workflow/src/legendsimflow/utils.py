@@ -39,7 +39,6 @@ def get_some_list(field: str | list) -> list:
     return slist
 
 
-# TODO: improve error messages
 def get_simconfig(
     config: AttrsDict,
     tier: str,
@@ -61,16 +60,25 @@ def get_simconfig(
     field
         if not none, return the value of this key in the simconfig.
     """
-    block = f"simprod/config/tier/{tier}/{config.experiment}/simconfig/{simid}"
-    _m = config.metadata.simprod.config
+    try:
+        _m = config.metadata.simprod.config
+    except FileNotFoundError as e:
+        raise SimflowConfigError(e) from e
+
+    block = f"simprod.config.tier.{tier}.{config.experiment}.simconfig"
     try:
         if simid is None:
+            block = f"simprod.config.tier.{tier}.{config.experiment}"
             return _m.tier[tier][config.experiment].simconfig
         if field is None:
             return _m.tier[tier][config.experiment].simconfig[simid]
         return _m.tier[tier][config.experiment].simconfig[simid][field]
-    except (KeyError, FileNotFoundError) as e:
-        raise SimflowConfigError(block, e) from e
+
+    except KeyError as e:
+        msg = f"key {e} not found!"
+        raise SimflowConfigError(msg, block) from e
+    except FileNotFoundError as e:
+        raise SimflowConfigError(e, block) from e
 
 
 def hash_dict(d):
