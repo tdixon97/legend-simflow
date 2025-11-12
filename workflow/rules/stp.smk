@@ -37,7 +37,7 @@ rule gen_geom_config:
     input:
         Path(config.paths.config) / "geom" / (config.experiment + "-geom-config.yaml"),
     output:
-        patterns.geom_config(config),
+        patterns.geom_config_filename(config),
     params:
         # make this rule dependent on the actual simconfig block
         _simconfig_hash=lambda wc: utils.smk_hash_simconfig(
@@ -64,7 +64,7 @@ rule build_geom_gdml:
     message:
         "Building GDML geometry for {wildcards.tier}.{wildcards.simid}"
     input:
-        patterns.geom_config(config),
+        rules.gen_geom_config.output,
     output:
         patterns.geom_gdml_filename(config),
     log:

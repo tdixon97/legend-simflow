@@ -58,10 +58,6 @@ def simjob_base_segment(config, **kwargs) -> str:
     return _expand("{simid}/" + config.experiment + "-{simid}_{jobid}", **kwargs)
 
 
-# Backward compatibility alias (to be removed in a future release)
-simjob_rel_basename = simjob_base_segment
-
-
 def log_filename(config, time: str, **kwargs) -> Path:
     """Formats a log file path for a `simid` and `jobid`."""
     pat = (
@@ -83,15 +79,15 @@ def benchmark_filename(config, **kwargs) -> Path:
     return _expand(pat, **kwargs)
 
 
-def plots_filepath(config, **kwargs) -> Path:
-    """Formats a benchmark file path for a `simid` and `jobid`."""
+def plots_dirname(config, **kwargs) -> Path:
+    """Formats the plots directory path for a `simid` and `tier`."""
     return _expand(Path(config.paths.plots) / "{tier}" / "{simid}", **kwargs)
 
 
 # geometry
 
 
-def geom_config(config, **kwargs) -> Path:
+def geom_config_filename(config, **kwargs) -> Path:
     pat = Path(config.paths.geom) / (
         config.experiment + "-{simid}-tier_{tier}-geom-config.yaml"
     )
