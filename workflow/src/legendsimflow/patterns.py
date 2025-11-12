@@ -35,75 +35,86 @@ from pathlib import Path
 
 from snakemake.io import expand
 
+from . import utils
 
-def simjob_rel_basename(config, **kwargs):
+
+def _expand(pattern: str | Path, keep_list: bool = False, **kwargs) -> str | Path:
+    # stringfy
+    _str_pattern = pattern.as_posix() if isinstance(pattern, Path) else pattern
+
+    exp = expand(_str_pattern, **kwargs, allow_missing=True)
+
+    if isinstance(pattern, Path):
+        exp = [Path(e) for e in exp]
+
+    if len(exp) == 1 and not keep_list:
+        exp = exp[0]
+
+    return exp
+
+
+def simjob_rel_basename(config, **kwargs) -> str:
     """Formats a partial output path for a `simid` and `jobid`."""
-    return expand(
-        "{simid}/" + config.experiment + "-{simid}_{jobid}",
-        **kwargs,
-        allow_missing=True,
-    )[0]
+    return _expand("{simid}/" + config.experiment + "-{simid}_{jobid}", **kwargs)
 
 
-def log_filename(config, time, **kwargs):
+def log_filename(config, time: str, **kwargs) -> Path:
     """Formats a log file path for a `simid` and `jobid`."""
-    pat = str(
+    pat = (
         Path(config.paths.log)
         / time
         / "{tier}"
         / (simjob_rel_basename(config) + "-tier_{tier}.log")
     )
-    return expand(pat, **kwargs, allow_missing=True)[0]
+    return _expand(pat, **kwargs)
 
 
-def benchmark_filename(config, **kwargs):
+def benchmark_filename(config, **kwargs) -> Path:
     """Formats a benchmark file path for a `simid` and `jobid`."""
-    pat = str(
+    pat = (
         Path(config.paths.benchmarks)
         / "{tier}"
         / (simjob_rel_basename(config) + "-tier_{tier}.tsv")
     )
-    return expand(pat, **kwargs, allow_missing=True)[0]
+    return _expand(pat, **kwargs)
 
 
-def plots_filepath(config, **kwargs):
+def plots_filepath(config, **kwargs) -> Path:
     """Formats a benchmark file path for a `simid` and `jobid`."""
-    pat = str(Path(config.paths.plots) / "{tier}" / "{simid}")
-    return expand(pat, **kwargs, allow_missing=True)[0]
+    return _expand(Path(config.paths.plots) / "{tier}" / "{simid}", **kwargs)
 
 
 # geometry
 
 
-def geom_config(config, **kwargs):
-    pat = str(
-        Path(config.paths.geom)
-        / (config.experiment + "-{simid}-tier_{tier}-geom-config.yaml")
+def geom_config(config, **kwargs) -> Path:
+    pat = Path(config.paths.geom) / (
+        config.experiment + "-{simid}-tier_{tier}-geom-config.yaml"
     )
-    return expand(pat, **kwargs, allow_missing=True)[0]
+    return _expand(pat, **kwargs)
 
 
-def geom_gdml_filename(config, **kwargs):
-    pat = str(
-        Path(config.paths.geom) / (config.experiment + "-{simid}-tier_{tier}-geom.gdml")
+def geom_gdml_filename(config, **kwargs) -> Path:
+    pat = Path(config.paths.geom) / (
+        config.experiment + "-{simid}-tier_{tier}-geom.gdml"
     )
-    return expand(pat, **kwargs, allow_missing=True)[0]
+    return _expand(pat, **kwargs)
 
 
-def geom_log_filename(config, time, **kwargs):
-    pat = str(
+def geom_log_filename(config, time: str, **kwargs) -> str:
+    pat = (
         Path(config.paths.log)
         / time
         / "geom"
         / (config.experiment + "-{simid}-tier_{tier}-geom.log")
     )
-    return expand(pat, **kwargs, allow_missing=True)[0]
+    return _expand(pat, **kwargs)
 
 
 # ver, stp, hit tiers
 
 
-def input_simjob_filename(config, **kwargs):
+def input_simjob_filename(config, **kwargs) -> Path:
     """Returns the full path to the input file for a `simid`, `tier` and job index."""
     tier = kwargs.get("tier")
 
@@ -113,11 +124,10 @@ def input_simjob_filename(config, **kwargs):
 
     ext = ".mac" if tier in ("ver", "stp") else ".lh5"
     fname = config.experiment + "-{simid}" + f"-tier_{tier}" + ext
-    expr = str(Path(config.paths.macros) / f"{tier}" / fname)
-    return expand(expr, **kwargs, allow_missing=True)[0]
+    return _expand(Path(config.paths.macros) / f"{tier}" / fname, **kwargs)
 
 
-def output_simjob_filename(config, **kwargs):
+def output_simjob_filename(config, **kwargs) -> Path:
     """Returns the full path to the output file for a `simid`, `tier` and job index."""
     tier = kwargs.get("tier")
 
@@ -126,11 +136,10 @@ def output_simjob_filename(config, **kwargs):
         raise RuntimeError(msg)
 
     fname = simjob_rel_basename(config) + f"-tier_{tier}.lh5"
-    expr = str(Path(config.paths[f"tier_{tier}"]) / fname)
-    return expand(expr, **kwargs, allow_missing=True)[0]
+    return _expand(Path(config.paths[f"tier_{tier}"]) / fname, **kwargs)
 
 
-def output_simjob_regex(config, **kwargs):
+def output_simjob_regex(config, **kwargs) -> str:
     tier = kwargs.get("tier")
 
     if tier is None:
@@ -139,57 +148,55 @@ def output_simjob_regex(config, **kwargs):
 
     fname = config.experiment + "-*-tier_{tier}.lh5"
     expr = str(Path(config["paths"][f"tier_{tier}"]) / "{simid}" / fname)
-    return expand(expr, **kwargs, allow_missing=True)[0]
+    return _expand(expr, **kwargs)
 
 
-def input_simid_filenames(config, n_macros, **kwargs):
+def input_simid_filenames(config, n_macros, **kwargs) -> list[Path]:
     """Returns the full path to `n_macros` input files for a `simid`. Needed by
     script that generates all macros for a `simid`.
     """
     pat = input_simjob_filename(config, **kwargs)
     jobids = expand("{id:>04d}", id=list(range(n_macros)))
-    return expand(pat, jobid=jobids, **kwargs, allow_missing=True)
+    return _expand(pat, jobid=jobids, keep_list=True, **kwargs)
 
 
 def output_simid_filenames(config, n_macros, **kwargs):
     """Returns the full path to `n_macros` output files for a `simid`."""
     pat = output_simjob_filename(config, **kwargs)
     jobids = expand("{id:>04d}", id=list(range(n_macros)))
-    return expand(pat, jobid=jobids, **kwargs, allow_missing=True)
+    return _expand(pat, jobid=jobids, keep_list=True, **kwargs)
 
 
-# def ver_filename_for_stp(config, simid):
-#     """Returns the vertices file needed for the 'stp' tier job, if needed. Used
-#     as lambda function in the `build_tier_stp` Snakemake rule."""
-#     sconfig = get_simconfig(config, "stp", simid)
-#     if "vertices" in sconfig:
-#         return output_simjob_filename(config, tier="ver", simid=sconfig.vertices)
-#     return []
+def ver_filename_for_stp(config, simid: str) -> Path | list:
+    """Returns the vertices file needed for the 'stp' tier job, if needed. Used
+    as lambda function in the `build_tier_stp` Snakemake rule."""
+    sconfig = utils.get_simconfig(config, "stp", simid)
+    if "vertices" in sconfig:
+        return output_simjob_filename(config, tier="ver", simid=sconfig.vertices)
+    return []
 
 
 # drift time maps
 
 
-def output_dtmap_filename(config, **kwargs):
-    pat = str(
-        Path(config.paths.dtmaps) / "{runid}-{hpge_detector}-hpge-drift-time-map.lh5"
-    )
-    return expand(pat, **kwargs, allow_missing=True)[0]
+def output_dtmap_filename(config, **kwargs) -> Path:
+    pat = Path(config.paths.dtmaps) / "{runid}-{hpge_detector}-hpge-drift-time-map.lh5"
+    return _expand(pat, **kwargs)
 
 
-def output_dtmap_merged_filename(config, **kwargs):
-    pat = str(Path(config.paths.dtmaps) / "{runid}-hpge-drift-time-maps.lh5")
-    return expand(pat, **kwargs, allow_missing=True)[0]
+def output_dtmap_merged_filename(config, **kwargs) -> Path:
+    pat = Path(config.paths.dtmaps) / "{runid}-hpge-drift-time-maps.lh5"
+    return _expand(pat, **kwargs)
 
 
-def log_dtmap_filename(config, time, **kwargs):
-    pat = str(
+def log_dtmap_filename(config, time: str, **kwargs) -> Path:
+    pat = (
         Path(config.paths.log)
         / time
         / "hpge_dtmaps"
         / "{runid}-{hpge_detector}-drift-time-map.log"
     )
-    return expand(pat, **kwargs, allow_missing=True)[0]
+    return _expand(pat, **kwargs)
 
 
 # evt tier

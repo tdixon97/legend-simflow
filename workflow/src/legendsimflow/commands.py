@@ -132,7 +132,9 @@ def remage_run(
 
         cmd += ["--"]
 
-        cmd += [patterns.input_simjob_filename(config, tier=tier, simid=simid)]
+        cmd += [
+            patterns.input_simjob_filename(config, tier=tier, simid=simid).as_posix()
+        ]
 
     return shlex.join(cmd)
 
@@ -277,7 +279,7 @@ def make_remage_macro(config: Mapping, simid: str, tier: str = "stp") -> (str, P
         text = lds.subst_vars(f.read().strip(), mac_subs, ignore_missing=False)
 
     # now write the macro to disk
-    ofile = Path(patterns.input_simjob_filename(config, tier=tier, simid=simid))
+    ofile = patterns.input_simjob_filename(config, tier=tier, simid=simid)
     ofile.parent.mkdir(parents=True, exist_ok=True)
     with ofile.open("w") as f:
         f.write(text)

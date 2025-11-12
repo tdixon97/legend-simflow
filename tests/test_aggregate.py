@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from dbetto import AttrsDict
 
 from legendsimflow import aggregate as agg
@@ -35,7 +37,7 @@ def test_simid_harvesting(config):
 def test_simid_outputs(config):
     outputs = agg.gen_list_of_all_simid_outputs(config, "stp")
     assert isinstance(outputs, list)
-    assert all(isinstance(s, str) for s in outputs)
+    assert all(isinstance(s, Path) for s in outputs)
     assert len(outputs) == sum(
         [
             agg.get_simid_njobs(config, "stp", s)
