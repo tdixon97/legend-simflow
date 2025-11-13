@@ -41,13 +41,6 @@ onstart:
 
     utils.setup_logdir_link(config, SIMFLOW_CONTEXT.proctime)
 
-    # instantiate Julia project
-    print("INFO: instantiating Julia project")
-    shell(
-        f"julia --project={SIMFLOW_CONTEXT.basedir}/src/legendsimflow/scripts "
-        "-e 'using Pkg; Pkg.instantiate()'"
-    )
-
     # make sure some packages are initialized before we begin to avoid race conditions
     # https://numba.readthedocs.io/en/stable/developer/caching.html#cache-sharing
     if not workflow.touch and "precompile_pkg" in config:
