@@ -17,7 +17,8 @@ apidoc: clean-apidoc
       --module-first \
       --force \
       --output-dir "$(SOURCEDIR)/api" \
-      ../workflow/src
+      ../workflow/src \
+      ../workflow/src/legendsimflow/scripts
 	python tools/generate_rule_docs.py
 
 clean-apidoc:

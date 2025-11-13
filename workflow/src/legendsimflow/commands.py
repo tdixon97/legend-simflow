@@ -1,21 +1,18 @@
 from __future__ import annotations
 
 import shlex
-from collections.abc import Mapping
 from pathlib import Path
 
 import legenddataflowscripts as lds
 import numpy as np
-from legendmeta import LegendMetadata
 
-from . import patterns
+from . import SimflowConfig, patterns
 from .exceptions import SimflowConfigError
 from .utils import get_simconfig
 
 
 def remage_run(
-    config: Mapping,
-    metadata: LegendMetadata,
+    config: SimflowConfig,
     simid: str,
     tier: str = "stp",
     geom: str | Path = "{input.geom}",
@@ -70,10 +67,10 @@ def remage_run(
 
     # get the config block for this tier/simid
     block = f"simprod.config.tier.{tier}.{config.experiment}.simconfig.{simid}"
-    sim_cfg = get_simconfig(config, metadata, tier, simid=simid)
+    sim_cfg = get_simconfig(config, tier, simid=simid)
 
     # get macro
-    macro_text, _ = make_remage_macro(config, metadata, simid, tier=tier)
+    macro_text, _ = make_remage_macro(config, simid, tier=tier)
 
     # need some modifications if this is a benchmark run
     try:
@@ -85,7 +82,8 @@ def remage_run(
             if is_benchmark:
                 n_prim_pj = config.benchmark.n_primaries[tier]
     except KeyError as e:
-        raise SimflowConfigError(block, e) from e
+        msg = f"key {e} not found!"
+        raise SimflowConfigError(msg, block) from e
 
     # substitution rules
     cli_subs = {
@@ -133,13 +131,15 @@ def remage_run(
 
         cmd += ["--"]
 
-        cmd += [patterns.input_simjob_filename(config, tier=tier, simid=simid)]
+        cmd += [
+            patterns.input_simjob_filename(config, tier=tier, simid=simid).as_posix()
+        ]
 
     return shlex.join(cmd)
 
 
 def make_remage_macro(
-    config: Mapping, metadata: LegendMetadata, simid: str, tier: str = "stp"
+    config: SimflowConfig, simid: str, tier: str = "stp"
 ) -> (str, Path):
     """Render the remage macro for a given simulation and write it to disk.
 
@@ -181,7 +181,7 @@ def make_remage_macro(
     """
     # get the config block for this tier/simid
     block = f"simprod.config.tier.{tier}.{config.experiment}.simconfig.{simid}"
-    sim_cfg = get_simconfig(config, metadata, tier, simid=simid)
+    sim_cfg = get_simconfig(config, tier, simid=simid)
     mac_subs = {}
 
     # determine whether external vertices are required
@@ -195,18 +195,19 @@ def make_remage_macro(
             "~defines:"
         ):
             msg = (
-                f"{block}.generator",
                 "the field must be a string prefixed by ~define:",
+                f"{block}.generator",
             )
             raise SimflowConfigError(*msg)
 
         key = sim_cfg.generator.removeprefix("~defines:")
         try:
-            generator = metadata.simprod.config.tier[tier][
+            generator = config.metadata.simprod.config.tier[tier][
                 config.experiment
             ].generators[key]
         except KeyError as e:
-            raise SimflowConfigError(block, e) from e
+            msg = f"key {e} not found!"
+            raise SimflowConfigError(msg, block) from e
 
         if not isinstance(generator, str):
             generator = "\n".join(generator)
@@ -220,11 +221,12 @@ def make_remage_macro(
             if sim_cfg.confinement.startswith("~defines:"):
                 key = sim_cfg.confinement.removeprefix("~defines:")
                 try:
-                    confinement = metadata.simprod.config.tier[tier][
+                    confinement = config.metadata.simprod.config.tier[tier][
                         config.experiment
                     ].confinement[key]
                 except KeyError as e:
-                    raise SimflowConfigError(block, e) from e
+                    msg = f"key {e} not found!"
+                    raise SimflowConfigError(msg, block) from e
 
             elif sim_cfg.confinement.startswith(
                 ("~volumes.surface:", "~volumes.bulk:")
@@ -256,11 +258,11 @@ def make_remage_macro(
 
         if confinement is None:
             msg = (
-                f"{block}.confinement",
                 (
                     "the field must be a str or list[str] prefixed by "
                     "~define: / ~volumes.surface: / ~volumes.bulk:"
                 ),
+                f"{block}.confinement",
             )
             raise SimflowConfigError(*msg)
 
@@ -273,12 +275,12 @@ def make_remage_macro(
     mac_subs |= sim_cfg.get("macro_substitutions", {})
 
     # read in template and substitute
-    template_path = get_simconfig(config, metadata, tier, simid=simid, field="template")
+    template_path = get_simconfig(config, tier, simid=simid, field="template")
     with Path(template_path).open() as f:
         text = lds.subst_vars(f.read().strip(), mac_subs, ignore_missing=False)
 
     # now write the macro to disk
-    ofile = Path(patterns.input_simjob_filename(config, tier=tier, simid=simid))
+    ofile = patterns.input_simjob_filename(config, tier=tier, simid=simid)
     ofile.parent.mkdir(parents=True, exist_ok=True)
     with ofile.open("w") as f:
         f.write(text)
