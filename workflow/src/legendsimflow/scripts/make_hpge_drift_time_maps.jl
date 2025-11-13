@@ -16,7 +16,6 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using SolidStateDetectors
-using LegendTestData
 using LegendDataManagement
 using Unitful
 using LegendHDF5IO

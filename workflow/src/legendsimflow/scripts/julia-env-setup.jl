@@ -7,3 +7,4 @@ if !ispath(joinpath(first(DEPOT_PATH), "registries", "LegendJuliaRegistry"))
 end
 
 Pkg.instantiate()
+Pkg.precompile()

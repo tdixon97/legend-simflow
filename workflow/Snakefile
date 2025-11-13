@@ -45,7 +45,7 @@ onstart:
     print("INFO: instantiating Julia project")
     shell(
         f"cd {SIMFLOW_CONTEXT.basedir}/src/legendsimflow/scripts && "
-        "julia --project=. ./julia-env-setup.jl"
+        "julia --startup-file=no --project=. ./julia-env-setup.jl"
     )
 
     # make sure some packages are initialized before we begin to avoid race conditions
