@@ -28,3 +28,18 @@ rule print_benchmark_stats:
     localrule: True
     script:
         "../src/legendsimflow/scripts/print_benchmark_stats.py"
+
+
+# we use a dedicated dummy rule to initialize the Julia environment, in this
+# way it's still possible to use Julia from a rule-specific conda env
+rule _init_julia_env:
+    message:
+        "Initializing Julia environment"
+    output:
+        f"{SIMFLOW_CONTEXT.basedir}/.snakemake/.julia-env-initialized",
+    conda:
+        f"{SIMFLOW_CONTEXT.basedir}/envs/julia.yaml"
+    shell:
+        "cd workflow/src/legendsimflow/scripts && "
+        "julia --project=. ./init-julia-env.jl && "
+        "touch {output}"

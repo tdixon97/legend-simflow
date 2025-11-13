@@ -52,6 +52,7 @@ def smk_hpge_drift_time_map_inputs(wildcards):
         "detdb_file": diode,
         "crydb_file": crystal,
         "opv_file": opv,
+        "_dummy": rules._init_julia_env.output,
     }
 
 
