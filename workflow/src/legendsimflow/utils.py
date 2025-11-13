@@ -15,17 +15,17 @@
 
 from __future__ import annotations
 
+import fnmatch
 import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
 
 import legenddataflowscripts as ldfs
+import pyg4ometry as pg4
 from dbetto import AttrsDict
 from legendmeta import LegendMetadata
 from snakemake.io import Wildcards
-import pyg4ometry as pg4
-import fnmatch
 
 from . import SimflowConfig
 from .exceptions import SimflowConfigError
@@ -108,6 +108,7 @@ def get_simconfig(
     except FileNotFoundError as e:
         raise SimflowConfigError(e, block) from e
 
+
 def _get_matching_volumes(volume_list: list, patterns: str | list) -> list[int]:
     """Get the list of volumes from the GDML. The string can include wildcards."""
 
@@ -121,7 +122,13 @@ def _get_matching_volumes(volume_list: list, patterns: str | list) -> list[int]:
                 matched_list.append(key)
     return matched_list
 
-def get_lar_minishroud_confine_commands(reg:pg4.geant4.Registry, pattern:str = "minishroud_side*", inside:bool = True, lar_name:str = "LAr")- > list[str]:
+
+def get_lar_minishroud_confine_commands(
+    reg: pg4.geant4.Registry,
+    pattern: str = "minishroud_side*",
+    inside: bool = True,
+    lar_name: str = "LAr",
+) -> list[str]:
     """Extract the commands for the LAr confinement inside/ outside the NMS from the GDML.
 
     Parameters
@@ -139,18 +146,15 @@ def get_lar_minishroud_confine_commands(reg:pg4.geant4.Registry, pattern:str = "
     -------
     a list of confinement commands for remage.
     """
-    string_list = _get_matching_volumes(
-        list(reg.physicalVolumeDict.keys()), "minishroud_side*"
-    )
+    string_list = _get_matching_volumes(list(reg.physicalVolumeDict.keys()), pattern)
     # correct sampling mode
-    mode =  "IntersectPhysicalWithGeometrical" if inside else "SubtractGeometrical"
+    mode = "IntersectPhysicalWithGeometrical" if inside else "SubtractGeometrical"
 
     # physical volume sampling
     lines = [f"/RMG/Generator/Confinement/SamplingMode {mode}"]
     lines += [f"/RMG/Generator/Confinement/Physical/AddVolume {lar_name}"]
 
     for s in string_list:
-
         vol = reg.physicalVolumeDict[s]
 
         center = vol.position.eval()
@@ -170,10 +174,18 @@ def get_lar_minishroud_confine_commands(reg:pg4.geant4.Registry, pattern:str = "
         command = "AddSolid" if inside else "AddExcludeSolid"
         lines.append(f"/RMG/Generator/Confinement/Geometrical/{command} Cylinder ")
 
-        lines.append(f"/RMG/Generator/Confinement/Geometrical/CenterPositionX {center[0]} mm")
-        lines.append(f"/RMG/Generator/Confinement/Geometrical/CenterPositionY {center[1]} mm")
-        lines.append(f"/RMG/Generator/Confinement/Geometrical/CenterPositionZ {center[2]} mm")
-        lines.append(f"/RMG/Generator/Confinement/Geometrical/Cylinder/OuterRadius {r_max} mm")
+        lines.append(
+            f"/RMG/Generator/Confinement/Geometrical/CenterPositionX {center[0]} mm"
+        )
+        lines.append(
+            f"/RMG/Generator/Confinement/Geometrical/CenterPositionY {center[1]} mm"
+        )
+        lines.append(
+            f"/RMG/Generator/Confinement/Geometrical/CenterPositionZ {center[2]} mm"
+        )
+        lines.append(
+            f"/RMG/Generator/Confinement/Geometrical/Cylinder/OuterRadius {r_max} mm"
+        )
         lines.append(f"/RMG/Generator/Confinement/Geometrical/Cylinder/Height {dz} mm")
 
     return lines
