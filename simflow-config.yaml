@@ -1,7 +1,7 @@
-experiment: l200p15
+experiment: l200cfg01
 
-# runlist:
-# - l200-p03-r000-phy
+runlist:
+- l200-p03-r000-phy
 # - l200-p03-r001-phy
 # - l200-p03-r002-phy
 # - l200-p03-r005-phy
@@ -14,9 +14,7 @@ make_tiers:
   - vtx
   - stp
   - hit
-
-# legend_metadata_version: main
-
+  
 benchmark:
   enabled: false
   n_primaries:
@@ -31,7 +29,7 @@ paths:
   config: $_/inputs/simprod/config
   optical_maps:
     fiber: $_/inputs/simprod/l200a-optical-map-fiber.lh5
-    lar: $_/inputs/simprod/l200a-optical-map-lar.lh5
+    lar: /dvs_ro/cfs/cdirs/m2676/sims/optmap/l200cfg01/l200cfg01-optmap-v2.lh5
     pen: $_/inputs/simprod/l200a-optical-map-pen.lh5
 
   genconfig: $_/generated/config
@@ -46,13 +44,14 @@ paths:
   pdf_releases: $_/generated/releases
   plots: $_/generated/plots
 #
-# precompile_pkg:
-#   - lgdo
-#   - matplotlib
-#   - reboost
-#   - legendhpges
-#   - legendoptics
-#   - pygeomtools
+
+precompile_pkg:
+   - lgdo
+   - matplotlib
+   - reboost
+   - legendhpges
+   - legendoptics
+   - pygeomtools
 #
 # runcmd:
 #   remage: apptainer run --cleanenv /home/gipert/sw/apptainer/remage_latest.sif

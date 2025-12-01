@@ -24,7 +24,6 @@ from . import SimflowConfig, patterns
 from .exceptions import SimflowConfigError
 from .metadata import get_simconfig
 
-
 def remage_run(
     config: SimflowConfig,
     simid: str,
