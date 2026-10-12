@@ -296,7 +296,12 @@ def validate_detinfo_against_l200data(
     data_config["metadata"] = LegendMetadata(str(inputs))
     data_config = AttrsDict(data_config)
 
-    data_detinfo = pivot_detinfo(gen_list_of_all_usabilities(data_config).to_dict())
+    flags = list(flags)
+    # the data production metadata has no simprod config: query the same runs
+    runids = {runid for flag in flags for runid in detinfo.get(flag, {})}
+    data_detinfo = pivot_detinfo(
+        gen_list_of_all_usabilities(data_config, runids).to_dict()
+    )
 
     for flag in flags:
         sim = detinfo.get(flag, {})
@@ -559,6 +564,7 @@ def build_hpge_modeling_cache(
 
 def gen_list_of_all_usabilities(
     config: SimflowConfig,
+    runids: Iterable[str] | None = None,
 ) -> AttrsDict[str, AttrsDict[str, dict]]:
     """Generate a usability mapping for all detectors and all runs defined in the Simflow.
 
@@ -599,17 +605,23 @@ def gen_list_of_all_usabilities(
     ----------
     config
         Simflow configuration object.
+    runids
+        Runs to query. By default, all the runs required by the Simflow
+        (this needs the ``simprod`` metadata).
 
     """
-    all_runids = set()
-    for simid in gen_list_of_all_simids(config):
-        all_runids.update(get_runlist(config, simid))
+    if runids is not None:
+        all_runids = set(runids)
+    else:
+        all_runids = set()
+        for simid in gen_list_of_all_simids(config):
+            all_runids.update(get_runlist(config, simid))
 
-    rc_runid = get_tier_settings(config, "evt").get("random_coincidence_runid")
-    if isinstance(rc_runid, Mapping):
-        all_runids.update(rc_runid.values())
-    elif rc_runid is not None:
-        all_runids.add(rc_runid)
+        rc_runid = get_tier_settings(config, "evt").get("random_coincidence_runid")
+        if isinstance(rc_runid, Mapping):
+            all_runids.update(rc_runid.values())
+        elif rc_runid is not None:
+            all_runids.add(rc_runid)
 
     out_dict = {}
     for runid in all_runids:

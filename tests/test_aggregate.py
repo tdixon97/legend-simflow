@@ -641,12 +641,17 @@ def test_validate_detinfo_against_l200data(config, monkeypatch):
     data["l200-p02-r000-phy"]["V00048B"] = {"usability": "off"}
 
     monkeypatch.setattr(agg_mod, "LegendMetadata", lambda *_: None)
-    monkeypatch.setattr(
-        agg_mod, "gen_list_of_all_usabilities", lambda _: AttrsDict(data)
-    )
+    queried = []
+
+    def fake_usabilities(_, runids):
+        queried.append(set(runids))
+        return AttrsDict(data)
+
+    monkeypatch.setattr(agg_mod, "gen_list_of_all_usabilities", fake_usabilities)
 
     config.paths["l200data"] = Path("/does/not/matter")
     agg.validate_detinfo_against_l200data(config, sim, ["usability"])
+    assert queried == [{"l200-p02-r000-phy"}]
 
     data["l200-p02-r000-phy"]["V00048B"]["usability"] = "on"
     with pytest.raises(SimflowConfigError) as err:
