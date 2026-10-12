@@ -22,6 +22,7 @@ from pathlib import Path
 
 import dbetto
 from dbetto import AttrsDict
+from legendmeta import LegendMetadata
 from legendmeta.police import validate_dict_schema
 
 from . import SimflowConfig, patterns
@@ -39,6 +40,8 @@ from .metadata import (
 )
 
 log = logging.getLogger(__name__)
+
+_MISSING = object()
 
 STEPS_ORDERED: list[str] = ["vtx", "stp", "par", "opt", "hit", "evt", "cvt", "pdf"]
 
@@ -256,6 +259,61 @@ def pivot_detinfo(
             for flag, value in entry.items():
                 out.setdefault(flag, {}).setdefault(runid, {})[det] = value
     return out
+
+
+def validate_detinfo_against_l200data(
+    config: SimflowConfig,
+    detinfo: Mapping[str, Mapping[str, Mapping[str, object]]],
+    flags: Iterable[str],
+) -> None:
+    """Check that detector info from the Simflow metadata matches the data production.
+
+    The background model fit often fails because the simulations were produced
+    with different metadata than the data. This recomputes the detector info
+    from the metadata snapshot used by the data production
+    (``{paths.l200data}/inputs``) and compares it, flag by flag, to `detinfo`
+    (as laid out by :func:`pivot_detinfo`) obtained from the Simflow metadata.
+
+    Does nothing if ``paths.l200data`` is not set.
+
+    Raises
+    ------
+    SimflowConfigError
+        if the detector info differs for any of the `flags`.
+    """
+    if "l200data" not in config.paths:
+        return
+
+    inputs = Path(config.paths.l200data) / "inputs"
+    data_config = dict(config)
+    data_config["metadata"] = LegendMetadata(str(inputs))
+    data_config = AttrsDict(data_config)
+
+    flags = list(flags)
+    if any(flag in ("is_modelable", "operational_voltage_in_V") for flag in flags):
+        data_detinfo = pivot_detinfo(gen_list_of_all_hpges_valid_for_modeling(data_config))
+    else:
+        data_detinfo = pivot_detinfo(gen_list_of_all_usabilities(data_config).to_dict())
+
+    for flag in flags:
+        sim = detinfo.get(flag, {})
+        data = data_detinfo.get(flag, {})
+        diffs = [
+            f"{runid}/{det}: simflow={sim.get(runid, {}).get(det)!r}, "
+            f"data={data.get(runid, {}).get(det)!r}"
+            for runid in sorted(set(sim) | set(data))
+            for det in sorted(set(sim.get(runid, {})) | set(data.get(runid, {})))
+            if sim.get(runid, {}).get(det, _MISSING) != data.get(runid, {}).get(det, _MISSING)
+        ]
+        if diffs:
+            shown = "\n  ".join(diffs[:20])
+            more = f"\n  ... and {len(diffs) - 20} more" if len(diffs) > 20 else ""
+            msg = (
+                f"'{flag}' differs between the Simflow metadata and the data "
+                f"production metadata in {inputs} ({len(diffs)} differences):"
+                f"\n  {shown}{more}"
+            )
+            raise SimflowConfigError(msg)
 
 
 def _hpge_is_modelable(
