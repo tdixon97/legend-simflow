@@ -648,7 +648,7 @@ def test_validate_detinfo_against_l200data(config, monkeypatch):
     agg.validate_detinfo_against_l200data(config, sim, ["usability"])
 
     data["l200-p02-r000-phy"]["V00048B"]["usability"] = "on"
-    with pytest.raises(SimflowConfigError, match="V00048B"):
+    with pytest.raises(SimflowConfigError, match="l200-p02-r000-phy"):
         agg.validate_detinfo_against_l200data(config, sim, ["usability"])
 
 

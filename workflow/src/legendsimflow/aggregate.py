@@ -41,8 +41,6 @@ from .metadata import (
 
 log = logging.getLogger(__name__)
 
-_MISSING = object()
-
 STEPS_ORDERED: list[str] = ["vtx", "stp", "par", "opt", "hit", "evt", "cvt", "pdf"]
 
 
@@ -295,22 +293,15 @@ def validate_detinfo_against_l200data(
     for flag in flags:
         sim = detinfo.get(flag, {})
         data = data_detinfo.get(flag, {})
-        diffs = [
-            f"{runid}/{det}: simflow={sim.get(runid, {}).get(det)!r}, "
-            f"data={data.get(runid, {}).get(det)!r}"
-            for runid in sorted(set(sim) | set(data))
-            for det in sorted(set(sim.get(runid, {})) | set(data.get(runid, {})))
-            if sim.get(runid, {}).get(det, _MISSING) != data.get(runid, {}).get(det, _MISSING)
-        ]
-        if diffs:
-            shown = "\n  ".join(diffs[:20])
-            more = f"\n  ... and {len(diffs) - 20} more" if len(diffs) > 20 else ""
-            msg = (
-                f"'{flag}' differs between the Simflow metadata and the data "
-                f"production metadata in {inputs} ({len(diffs)} differences):"
-                f"\n  {shown}{more}"
-            )
-            raise SimflowConfigError(msg)
+        if sim == data:
+            continue
+
+        runids = sorted(r for r in set(sim) | set(data) if sim.get(r) != data.get(r))
+        msg = (
+            f"'{flag}' differs between the Simflow metadata and the data "
+            f"production metadata in {inputs}, in runs: {', '.join(runids)}"
+        )
+        raise SimflowConfigError(msg)
 
 
 def _hpge_is_modelable(
