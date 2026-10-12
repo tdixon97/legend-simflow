@@ -649,8 +649,13 @@ def test_validate_detinfo_against_l200data(config, monkeypatch):
     agg.validate_detinfo_against_l200data(config, sim, ["usability"])
 
     data["l200-p02-r000-phy"]["V00048B"]["usability"] = "on"
-    with pytest.raises(SimflowConfigError, match="l200-p02-r000-phy"):
+    with pytest.raises(SimflowConfigError) as err:
         agg.validate_detinfo_against_l200data(config, sim, ["usability"])
+    assert (
+        "l200-p02-r000-phy V00048B: Simflow metadata has 'off', "
+        "data production has 'on'"
+    ) in str(err.value)
+    assert "V00048A" not in str(err.value)
 
 
 def test_validate_detinfo_skipped_without_l200data(config):

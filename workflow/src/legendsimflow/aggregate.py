@@ -310,10 +310,23 @@ def validate_detinfo_against_l200data(
         if sim == data:
             continue
 
-        runids = sorted(r for r in set(sim) | set(data) if sim.get(r) != data.get(r))
+        diffs = []
+        for runid in sorted(set(sim) | set(data)):
+            sim_run = sim.get(runid, {})
+            data_run = data.get(runid, {})
+            for det in sorted(set(sim_run) | set(data_run)):
+                sim_val = sim_run.get(det, "<missing>")
+                data_val = data_run.get(det, "<missing>")
+                if sim_val != data_val:
+                    diffs.append(
+                        f"  {runid} {det}: Simflow metadata has {sim_val!r}, "
+                        f"data production has {data_val!r}"
+                    )
+
         msg = (
             f"'{flag}' differs between the Simflow metadata and the data "
-            f"production metadata in {inputs}, in runs: {', '.join(runids)}"
+            f"production metadata in {inputs} for {len(diffs)} detector(s):\n"
+            + "\n".join(diffs)
         )
         raise SimflowConfigError(msg)
 
