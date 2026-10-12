@@ -271,6 +271,18 @@ def validate_detinfo_against_l200data(
     (as laid out by :func:`pivot_detinfo`) computed from the Simflow metadata.
     Does nothing if ``paths.l200data`` is not set.
 
+    Parameters
+    ----------
+    config
+        Simflow configuration object.
+    detinfo
+        Detector info computed from the Simflow metadata, in the layout
+        returned by :func:`pivot_detinfo`: ``{flag: {runid: {detector:
+        value}}}``.
+    flags
+        Names of the flags in `detinfo` to compare, e.g. ``["usability",
+        "psd_usability"]``.
+
     Raises
     ------
     SimflowConfigError
