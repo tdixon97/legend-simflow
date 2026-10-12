@@ -266,14 +266,11 @@ def validate_detinfo_against_l200data(
     detinfo: Mapping[str, Mapping[str, Mapping[str, object]]],
     flags: Iterable[str],
 ) -> None:
-    """Check that detector info from the Simflow metadata matches the data production.
+    """Check that detector info matches the data production metadata.
 
-    The background model fit often fails because the simulations were produced
-    with different metadata than the data. This recomputes the detector info
-    from the metadata snapshot used by the data production
-    (``{paths.l200data}/inputs``) and compares it, flag by flag, to `detinfo`
-    (as laid out by :func:`pivot_detinfo`) obtained from the Simflow metadata.
-
+    Recomputes the detector info from the metadata in
+    ``{paths.l200data}/inputs`` and compares it, flag by flag, to `detinfo`
+    (as laid out by :func:`pivot_detinfo`) computed from the Simflow metadata.
     Does nothing if ``paths.l200data`` is not set.
 
     Raises
