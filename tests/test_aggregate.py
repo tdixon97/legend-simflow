@@ -634,6 +634,7 @@ def test_simlist_named(fresh_config):
     with pytest.raises(SimflowConfigError):
         agg.process_simlist(config)
 
+
 def test_validate_detinfo_against_l200data(config, monkeypatch):
     sim = {"usability": {"l200-p02-r000-phy": {"V00048A": "on", "V00048B": "off"}}}
     data = {"l200-p02-r000-phy": {"V00048A": {"usability": "on"}}}

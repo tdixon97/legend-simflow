@@ -298,7 +298,9 @@ def validate_detinfo_against_l200data(
 
     flags = list(flags)
     if any(flag in ("is_modelable", "operational_voltage_in_V") for flag in flags):
-        data_detinfo = pivot_detinfo(gen_list_of_all_hpges_valid_for_modeling(data_config))
+        data_detinfo = pivot_detinfo(
+            gen_list_of_all_hpges_valid_for_modeling(data_config)
+        )
     else:
         data_detinfo = pivot_detinfo(gen_list_of_all_usabilities(data_config).to_dict())
 
