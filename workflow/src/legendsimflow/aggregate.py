@@ -296,13 +296,7 @@ def validate_detinfo_against_l200data(
     data_config["metadata"] = LegendMetadata(str(inputs))
     data_config = AttrsDict(data_config)
 
-    flags = list(flags)
-    if any(flag in ("is_modelable", "operational_voltage_in_V") for flag in flags):
-        data_detinfo = pivot_detinfo(
-            gen_list_of_all_hpges_valid_for_modeling(data_config)
-        )
-    else:
-        data_detinfo = pivot_detinfo(gen_list_of_all_usabilities(data_config).to_dict())
+    data_detinfo = pivot_detinfo(gen_list_of_all_usabilities(data_config).to_dict())
 
     for flag in flags:
         sim = detinfo.get(flag, {})

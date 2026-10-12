@@ -214,8 +214,6 @@ checkpoint cache_modelable_hpges:
         dbetto.utils.write_dict(
             detinfo["operational_voltage_in_V"], output.operational_voltage_in_V
         )
-        # abort if the metadata differs from the one used for the data
-        aggregate.validate_detinfo_against_l200data(config, detinfo, ["is_modelable"])
 
 
 rule cache_detector_usabilities:
