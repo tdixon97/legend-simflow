@@ -56,7 +56,7 @@ dependencies = [
     "legend-lh5io >=0.2.4",
     "legend-pydataobj >=2",
     "legend-pygeom-l200 >=0.10.1",
-    "legend-pygeom-l1000 >=0.5",
+    "legend-pygeom-l1000 >=0.6",
     "legend-pygeom-tools >=0.6",
     "legend-pygeom-hpges >=0.11",
     "matplotlib",
@@ -66,7 +66,7 @@ dependencies = [
     "pyg4ometry",
     "dspeed >=2.4.1",
     "pygama >=2.6.2",
-    "pylegendmeta >=1.10",
+    "pylegendmeta >=1.11",
     "pyyaml",
     "reboost >=1.3.1,<2",
     "revertex >=0.6",
@@ -119,9 +119,9 @@ dbetto = ">=1.4.1,<1.5"
 # legend-dataflow-scripts = "..."  # not on conda-forge
 legend-lh5io = ">=0.2.4,<0.3"
 legend-pydataobj = ">=2,<2.1"
-pylegendmeta = ">=1.10,<1.11"
+pylegendmeta = ">=1.11,<1.12"
 legend-pygeom-l200 = ">=0.10.1,<0.11"
-legend-pygeom-l1000 = ">=0.5,<0.6"
+legend-pygeom-l1000 = ">=0.6,<0.7"
 legend-pygeom-tools = ">=0.6,<0.7"
 dspeed = ">=2.4.1,<2.5"
 matplotlib = "*"
@@ -222,6 +222,7 @@ test-julia = { cmd = "julia --project=. -e 'using Pkg; Pkg.test()'", cwd = "work
 test-julia-ci = { cmd = "julia --code-coverage=user --project=. -e 'using Pkg; Pkg.test(coverage=true)'", cwd = "workflow/src/LegendSimflow.jl", depends-on = ["init-julia-env"] }
 test-python-pixi = { cmd = "pytest -vvv -m 'not needs_nersc' --ignore=tests/test_workflow.py --cov=legendsimflow --cov-report=xml", depends-on = ["warmup", "init-julia-env"] }
 test-l200-workflow = { cmd = "pytest -s -m 'needs_remage and not needs_nersc' tests/test_workflow.py::test_l200_workflow", depends-on = ["warmup"] }
+test-l1000-workflow = { cmd = "pytest -s -m 'needs_remage and not needs_nersc' tests/test_workflow.py::test_l1000_workflow", depends-on = ["warmup"] }
 test-l200-nersc-workflow = { cmd = "pytest -s -m needs_nersc", depends-on = [{ task = "warmup", args = ["tests/dummyprod/simflow-config-l200-nersc.yaml"] }] }
 test = { depends-on = ["test-python", "test-julia"] }
 
