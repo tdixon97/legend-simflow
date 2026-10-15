@@ -262,13 +262,9 @@ def pivot_detinfo(
 def validate_detinfo_against_l200data(
     config: SimflowConfig,
     detinfo: Mapping[str, Mapping[str, Mapping[str, object]]],
-    flags: Iterable[str],
 ) -> None:
-    """Check that detector info matches the data production metadata.
+    """Check that the detector usabilities match the data production metadata.
 
-    Recomputes the detector info from the metadata in
-    ``{paths.l200data}/inputs`` and compares it, flag by flag, to `detinfo`
-    (as laid out by :func:`pivot_detinfo`) computed from the Simflow metadata.
     Does nothing if ``paths.l200data`` is not set.
 
     Parameters
@@ -276,27 +272,18 @@ def validate_detinfo_against_l200data(
     config
         Simflow configuration object.
     detinfo
-        Detector info computed from the Simflow metadata, in the layout
-        returned by :func:`pivot_detinfo`: ``{flag: {runid: {detector:
-        value}}}``.
-    flags
-        Names of the flags in `detinfo` to compare, e.g. ``["usability",
-        "psd_usability"]``.
-
-    Raises
-    ------
-    SimflowConfigError
-        if the detector info differs for any of the `flags`.
+        Detector info computed from the Simflow metadata, as returned by
+        :func:`pivot_detinfo`.
     """
     if "l200data" not in config.paths:
         return
 
     inputs = Path(config.paths.l200data) / "inputs"
     data_config = dict(config)
-    data_config["metadata"] = LegendMetadata(str(inputs))
+    data_config["metadata"] = LegendMetadata(str(inputs), lazy=True)
     data_config = AttrsDict(data_config)
 
-    flags = list(flags)
+    flags = ["usability", "psd_usability"]
     # the data production metadata has no simprod config: query the same runs
     runids = {runid for flag in flags for runid in detinfo.get(flag, {})}
     data_detinfo = pivot_detinfo(

@@ -640,7 +640,7 @@ def test_validate_detinfo_against_l200data(config, monkeypatch):
     data = {"l200-p02-r000-phy": {"V00048A": {"usability": "on"}}}
     data["l200-p02-r000-phy"]["V00048B"] = {"usability": "off"}
 
-    monkeypatch.setattr(agg_mod, "LegendMetadata", lambda *_: None)
+    monkeypatch.setattr(agg_mod, "LegendMetadata", lambda *_, **__: None)
     queried = []
 
     def fake_usabilities(_, runids):
@@ -650,12 +650,12 @@ def test_validate_detinfo_against_l200data(config, monkeypatch):
     monkeypatch.setattr(agg_mod, "gen_list_of_all_usabilities", fake_usabilities)
 
     config.paths["l200data"] = Path("/does/not/matter")
-    agg.validate_detinfo_against_l200data(config, sim, ["usability"])
+    agg.validate_detinfo_against_l200data(config, sim)
     assert queried == [{"l200-p02-r000-phy"}]
 
     data["l200-p02-r000-phy"]["V00048B"]["usability"] = "on"
     with pytest.raises(SimflowConfigError) as err:
-        agg.validate_detinfo_against_l200data(config, sim, ["usability"])
+        agg.validate_detinfo_against_l200data(config, sim)
     assert (
         "l200-p02-r000-phy V00048B: Simflow metadata has 'off', "
         "data production has 'on'"
@@ -665,4 +665,4 @@ def test_validate_detinfo_against_l200data(config, monkeypatch):
 
 def test_validate_detinfo_skipped_without_l200data(config):
     config.paths.pop("l200data", None)
-    agg.validate_detinfo_against_l200data(config, {}, ["usability"])
+    agg.validate_detinfo_against_l200data(config, {})
