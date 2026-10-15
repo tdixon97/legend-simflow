@@ -50,6 +50,15 @@
 - For plotting code, always call `legendsimflow.plot.decorate(fig)` before any
   `savefig`/`pdf.savefig` call.
 
+## LEGEND-200 data production (`l200data`)
+
+- Read dataflow metadata (e.g. `dataprod/config`, DSP/hit configs) from
+  `<l200data>/inputs/`, never from the Simflow `inputs/` (`config.metadata`):
+  the processing must match the data production being analysed. From the Simflow
+  `inputs/`, use only `datasets`, `hardware` and `simprod`
+- Find tier and `par` paths with `utils.lookup_dataflow_config(l200data)`, not
+  hardcoded paths
+
 ## Resource constraints
 
 - Jobs run by Snakemake should not use more than **2 GB of memory** each. The
