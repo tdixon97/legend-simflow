@@ -662,6 +662,9 @@ def test_validate_detinfo_against_l200data(config, monkeypatch):
     ) in str(err.value)
     assert "V00048A" not in str(err.value)
 
+    config["allow_metadata_differences"] = True
+    agg.validate_detinfo_against_l200data(config, sim)
+
 
 def test_validate_detinfo_skipped_without_l200data(config):
     config.paths.pop("l200data", None)

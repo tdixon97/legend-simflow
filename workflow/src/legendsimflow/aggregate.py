@@ -265,7 +265,8 @@ def validate_detinfo_against_l200data(
 ) -> None:
     """Check that the detector usabilities match the data production metadata.
 
-    Does nothing if ``paths.l200data`` is not set.
+    Does nothing if ``paths.l200data`` is not set. Logs a warning instead of
+    raising an error if ``allow_metadata_differences`` is true.
 
     Parameters
     ----------
@@ -314,7 +315,10 @@ def validate_detinfo_against_l200data(
             f"production metadata in {inputs} for {len(diffs)} detector(s):\n"
             + "\n".join(diffs)
         )
-        raise SimflowConfigError(msg)
+        if config.get("allow_metadata_differences", False):
+            log.warning(msg)
+        else:
+            raise SimflowConfigError(msg)
 
 
 def _hpge_is_modelable(

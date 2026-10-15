@@ -57,6 +57,11 @@ Here's a basic description of its fields:
   `git checkout` accepts) for the _legend-metadata_ instance used by the
   simflow. If you are _developing_ metadata, comment this option. The revision
   must contain the HPGe operational voltages in `hardware/configuration/opvs/`.
+- `allow_metadata_differences`: if `true`, only log a warning when the HPGe
+  `usability` or `psd_usability` flags in the Simflow metadata differ from the
+  ones in the data production metadata (`{paths.l200data}/inputs`). By default
+  (`false`) the Simflow aborts. The check is skipped if `paths.l200data` is not
+  set.
 - `metadata_repo` (required): the metadata repository at `paths.metadata`,
   either `legend-metadata` or `legend1000-metadata`. It selects the
   {class}`~legendmeta.LegendMetadata` or {class}`~legendmeta.Legend1000Metadata`

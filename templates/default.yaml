@@ -30,6 +30,10 @@ make_steps:
 
 # legend_metadata_version: main
 
+# do not abort if the HPGe usabilities in the Simflow metadata differ from the
+# ones in the data production at paths.l200data
+# allow_metadata_differences: false
+
 # metadata repository at paths.metadata: legend-metadata or legend1000-metadata
 metadata_repo: legend-metadata
 
