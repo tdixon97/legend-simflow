@@ -22,6 +22,7 @@ from pathlib import Path
 
 import dbetto
 from dbetto import AttrsDict
+from legendmeta import LegendMetadata
 from legendmeta.police import validate_dict_schema
 
 from . import SimflowConfig, patterns
@@ -258,6 +259,68 @@ def pivot_detinfo(
     return out
 
 
+def validate_detinfo_against_l200data(
+    config: SimflowConfig,
+    detinfo: Mapping[str, Mapping[str, Mapping[str, object]]],
+) -> None:
+    """Check that the detector usabilities match the data production metadata.
+
+    Does nothing if ``paths.l200data`` is not set. Logs a warning instead of
+    raising an error if ``allow_metadata_differences`` is true.
+
+    Parameters
+    ----------
+    config
+        Simflow configuration object.
+    detinfo
+        Detector info computed from the Simflow metadata, as returned by
+        :func:`pivot_detinfo`.
+    """
+    if "l200data" not in config.paths:
+        return
+
+    inputs = Path(config.paths.l200data) / "inputs"
+    data_config = dict(config)
+    data_config["metadata"] = LegendMetadata(str(inputs), lazy=True)
+    data_config = AttrsDict(data_config)
+
+    flags = ["usability", "psd_usability"]
+    # the data production metadata has no simprod config: query the same runs
+    runids = {runid for flag in flags for runid in detinfo.get(flag, {})}
+    data_detinfo = pivot_detinfo(
+        gen_list_of_all_usabilities(data_config, runids).to_dict()
+    )
+
+    for flag in flags:
+        sim = detinfo.get(flag, {})
+        data = data_detinfo.get(flag, {})
+        if sim == data:
+            continue
+
+        diffs = []
+        for runid in sorted(set(sim) | set(data)):
+            sim_run = sim.get(runid, {})
+            data_run = data.get(runid, {})
+            for det in sorted(set(sim_run) | set(data_run)):
+                sim_val = sim_run.get(det, "<missing>")
+                data_val = data_run.get(det, "<missing>")
+                if sim_val != data_val:
+                    diffs.append(
+                        f"  {runid} {det}: Simflow metadata has {sim_val!r}, "
+                        f"data production has {data_val!r}"
+                    )
+
+        msg = (
+            f"'{flag}' differs between the Simflow metadata and the data "
+            f"production metadata in {inputs} for {len(diffs)} detector(s):\n"
+            + "\n".join(diffs)
+        )
+        if config.get("allow_metadata_differences", False):
+            log.warning(msg)
+        else:
+            raise SimflowConfigError(msg)
+
+
 def _hpge_is_modelable(
     config: SimflowConfig,
     name: str,
@@ -492,6 +555,7 @@ def build_hpge_modeling_cache(
 
 def gen_list_of_all_usabilities(
     config: SimflowConfig,
+    runids: Iterable[str] | None = None,
 ) -> AttrsDict[str, AttrsDict[str, dict]]:
     """Generate a usability mapping for all detectors and all runs defined in the Simflow.
 
@@ -532,17 +596,23 @@ def gen_list_of_all_usabilities(
     ----------
     config
         Simflow configuration object.
+    runids
+        Runs to query. By default, all the runs required by the Simflow
+        (this needs the ``simprod`` metadata).
 
     """
-    all_runids = set()
-    for simid in gen_list_of_all_simids(config):
-        all_runids.update(get_runlist(config, simid))
+    if runids is not None:
+        all_runids = set(runids)
+    else:
+        all_runids = set()
+        for simid in gen_list_of_all_simids(config):
+            all_runids.update(get_runlist(config, simid))
 
-    rc_runid = get_tier_settings(config, "evt").get("random_coincidence_runid")
-    if isinstance(rc_runid, Mapping):
-        all_runids.update(rc_runid.values())
-    elif rc_runid is not None:
-        all_runids.add(rc_runid)
+        rc_runid = get_tier_settings(config, "evt").get("random_coincidence_runid")
+        if isinstance(rc_runid, Mapping):
+            all_runids.update(rc_runid.values())
+        elif rc_runid is not None:
+            all_runids.add(rc_runid)
 
     out_dict = {}
     for runid in all_runids:

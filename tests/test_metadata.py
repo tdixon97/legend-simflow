@@ -10,6 +10,21 @@ from legendsimflow import metadata
 from legendsimflow.exceptions import SimflowConfigError
 
 
+def test_runinfo_old_metadata_layout(tmp_path):
+    (tmp_path / "datasets").mkdir()
+    (tmp_path / "dataprod").mkdir()
+    (tmp_path / "dataprod" / "runinfo.json").write_text(
+        '{"p03": {"r000": {"phy": {"start_key": "20230312T043356Z"}}}}'
+    )
+    old = AttrsDict(
+        {
+            "datasets": TextDB(tmp_path / "datasets"),
+            "dataprod": TextDB(tmp_path / "dataprod"),
+        }
+    )
+    assert metadata.runinfo(old, "l200-p03-r000-phy").start_key == "20230312T043356Z"
+
+
 def test_all(config):
     assert isinstance(
         metadata.get_simconfig(config, "stp", "birds_nest_K40"), AttrsDict

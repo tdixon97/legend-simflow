@@ -240,7 +240,12 @@ def runinfo(metadata: MetadataRepository, runid: str) -> str:
 
     """
     _, period, run, datatype = re.split(r"\W+", runid)
-    return metadata.datasets.runinfo[period][run][datatype]
+    try:
+        runinfo_db = metadata.datasets.runinfo
+    except FileNotFoundError:
+        # old metadata releases kept it in dataprod
+        runinfo_db = metadata.dataprod.runinfo
+    return runinfo_db[period][run][datatype]
 
 
 def reference_cal_run(metadata: MetadataRepository, runid: str) -> str:

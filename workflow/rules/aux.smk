@@ -252,6 +252,8 @@ rule cache_detector_usabilities:
             detinfo.get("crystal_metadata_usability", {}),
             output.crystal_metadata_usability,
         )
+        # abort if the metadata differs from the one used for the data
+        aggregate.validate_detinfo_against_l200data(config, detinfo)
 
 
 rule archive_plots:

@@ -48,6 +48,9 @@ Sphinx-based. Build: `cd docs && make`. Config in `docs/source/conf.py`. See
 ## Python docstring conventions
 
 - NumPy-style docstrings
+- Length follows complexity. Internal helpers (checks, conversions): a summary
+  line, a short `Parameters` section and nothing else (no `Raises`, no restating
+  the code)
 - Do not document input/output types (taken from type annotations)
 - Wrap prose at Ruff's default line length; never wrap the summary line
 - Reference Python methods with Sphinx RST cross-reference roles
