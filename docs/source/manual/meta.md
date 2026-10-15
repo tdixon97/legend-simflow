@@ -949,7 +949,7 @@ chi2_threshold: 3
 t0_field: spms/event_t0
 end_time_field: geds/psd/low_aoe/time
 drift_time_slices: "1000:200:2000"
-evt_tier_name: auto
+tier_name: auto
 max_files: null
 charge_output: wf_pz_win
 curr_output: curr_av
@@ -965,11 +965,14 @@ energy_output: cuspEmax
 | `t0_field`          | str         | `spms/event_t0`         | Event-level field used as the start time for drift-time calculation. Events where this field is NaN are discarded; for `spms/event_t0` this removes events without a coincident SiPM signal. |
 | `end_time_field`    | str         | `geds/psd/low_aoe/time` | Event-level field used as the end time for drift-time calculation.                                                                                                                           |
 | `drift_time_slices` | str         | `"1000:200:2000"`       | Drift-time bins as `start:step:stop` in ns; the default creates 200 ns-wide bins from 1000 to 2000 ns.                                                                                       |
-| `evt_tier_name`     | str         | `auto`                  | Name of the evt tier to read from the data production (`pet` or `evt`). With `auto`, use `pet` if the data production has it, otherwise `evt`.                                               |
+| `tier_name`         | str         | `auto`                  | Tier to select events from: `evt` or `pet` (event tiers), `hit` or `pht` (hit tiers). With `auto`, use `pet` if the data production has it, otherwise `evt`.                                 |
 | `max_files`         | int or null | `null`                  | If set, limits the number of raw and evt files processed per run (useful for testing).                                                                                                       |
 | `charge_output`     | str         | `wf_pz_win`             | DSP processing chain output name for the charge waveform.                                                                                                                                    |
 | `curr_output`       | str         | `curr_av`               | DSP processing chain output name for the current waveform.                                                                                                                                   |
 | `energy_output`     | str         | `cuspEmax`              | DSP processing chain output name for the energy estimator used in waveform normalisation.                                                                                                    |
+
+`t0_field` and `end_time_field` name fields of the `tier_name` tier: change them
+from the defaults when selecting from a `hit` or `pht` tier.
 
 (elecmod-metadata-dir)=
 
