@@ -31,9 +31,10 @@ import pygeomtools
 import reboost
 import reboost.hpge
 import reboost.math
+import reboost.units
 from dbetto import AttrsDict
 from dbetto.utils import load_dict
-from lgdo import Table
+from lgdo import Table, VectorOfVectors
 from lh5 import LH5Iterator
 from snakemake_argparse_bridge import snakemake_compatible
 
@@ -140,6 +141,8 @@ def main() -> None:
     tier_hit_settings = get_tier_settings(config, "hit")
 
     dead_layer_fraction = tier_hit_settings.dead_layer_fraction
+    store_surface_steps = tier_hit_settings.get("store_surface_steps", False)
+    surface_depth = tier_hit_settings.get("surface_depth_in_mm", 3)
     simulate_psd = tier_hit_settings.get("simulate_psd", True)
     simulate_psd_with_psl = tier_hit_settings.get("simulate_psd_with_psl", False)
 
@@ -376,6 +379,12 @@ def main() -> None:
                     det_name,
                 )
 
+            # steps beyond the cutoff get no distance (NaN) and count as fully
+            # active, so the cutoff must cover the surface table depth too
+            precompute_cutoff = fccd + 1
+            if store_surface_steps:
+                precompute_cutoff = max(precompute_cutoff, surface_depth)
+
             # iterate over input data
             for lgdo_chunk in iterator:
                 chunk = lgdo_chunk.view_as("ak", with_units=True)
@@ -388,7 +397,7 @@ def main() -> None:
                         pyobj,
                         det_loc[det_name],
                         distances_precompute=chunk.dist_to_surf,
-                        precompute_cutoff=(fccd + 1),
+                        precompute_cutoff=precompute_cutoff,
                         surface_type="nplus",
                     )
 
@@ -541,6 +550,39 @@ def main() -> None:
                         np.asarray(energy, dtype=np.float32), attrs={"units": "keV"}
                     ),
                 )
+
+                # the steps near the n+ surface, so that the energy can be
+                # recomputed later for other dead-layer models
+                if store_surface_steps:
+                    edep = reboost.units.units_conv_ak(chunk.edep, "keV")
+                    distance = reboost.units.units_conv_ak(_distance_to_nplus, "mm")
+                    # NaN distances (beyond precompute_cutoff) are in the bulk
+                    near_nplus = distance < surface_depth
+                    surface_table = Table(size=len(out_table))
+                    surface_table.add_field(
+                        "edep",
+                        VectorOfVectors(
+                            ak.values_astype(edep[near_nplus], np.float32),
+                            attrs={"units": "keV"},
+                        ),
+                    )
+                    surface_table.add_field(
+                        "distance_to_nplus",
+                        VectorOfVectors(
+                            ak.values_astype(distance[near_nplus], np.float32),
+                            attrs={"units": "mm"},
+                        ),
+                    )
+                    surface_table.add_field(
+                        "energy_bulk",
+                        lgdo.Array(
+                            np.asarray(
+                                ak.sum(edep[~near_nplus], axis=-1), dtype=np.float32
+                            ),
+                            attrs={"units": "keV"},
+                        ),
+                    )
+                    out_table.add_field("surface", surface_table)
                 # save psd fields: method-specific fields go into dedicated
                 # subtables under a common psd parent, one per simulation method
                 if simulate_psd or simulate_psd_with_psl:
