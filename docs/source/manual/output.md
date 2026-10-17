@@ -468,3 +468,37 @@ do not add up to `mul1`.
 `mul2` is a single global histogram and is **not** split by detector group.
 Per-channel or per-pair 2-D PDFs are out of scope for the current
 implementation.
+
+### Spectra on a grid of parameters
+
+{func}`legendsimflow.pdf_grid.build_pdf_grid` evaluates a PDF, a function of the
+parameter values that returns a histogram, on an evenly spaced grid of
+parameters. [Refit.jl](https://github.com/legend-exp/Refit.jl) reads the result
+as a generalised histogram and interpolates between the grid points. The
+parameters can be anything the PDF depends on; the dead-layer model below is one
+example.
+
+With `store_surface_steps: true`, the PDF can depend on the dead-layer model.
+For the hits of one detector (`in_det`) in the `evt/geds` table of a `cvt` file
+(`geds`), with nominal FCCD `fccd` (mm) and dead layer fraction `dlf`:
+
+```python
+surface = ak.to_packed(geds.surface[in_det])  # copy the hits of the detector
+energy = ak.flatten(geds.energy[in_det])
+dist = ak.flatten(surface.distance_to_nplus)
+edep = ak.flatten(surface.edep)
+act_nominal = piecewise_linear_activeness(dist, fccd, dlf)
+
+
+def pdf(pars):
+    act = piecewise_linear_activeness(dist, pars["fccd"], pars["dlf"])
+    # nominal (smeared) energy plus the change of the collected energy
+    e = energy + ak.sum(edep * (act - act_nominal), axis=-1)
+    return hist.new.Reg(6000, 0, 6000).Double().fill(e[e > 25])  # keV threshold
+
+
+grid = build_pdf_grid(pdf, {"fccd": (0.5, 1.5, 0.1), "dlf": (0, 0.9, 0.3)})
+```
+
+Cuts that depend on the energy, such as the threshold or the multiplicity, are
+applied to the recomputed energies inside `pdf`.
