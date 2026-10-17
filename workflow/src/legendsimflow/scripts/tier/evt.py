@@ -25,6 +25,7 @@ import legenddataflowscripts.utils
 import lh5
 import numpy as np
 import reboost
+import reboost.units
 from dbetto import AttrsDict
 from dbetto.utils import load_dict
 from lgdo import Array, Scalar, Struct, Table, VectorOfVectors
@@ -170,6 +171,9 @@ def main() -> None:
     tier_hit_settings = get_tier_settings(config, "hit")
     simulate_psd = tier_hit_settings.get("simulate_psd", True)
     simulate_psd_with_psl = tier_hit_settings.get("simulate_psd_with_psl", False)
+    store_surface_steps = not skip_hit and tier_hit_settings.get(
+        "store_surface_steps", False
+    )
 
     evt_file, move2cfs = nersc.make_on_scratch(config, evt_file)
 
@@ -444,8 +448,11 @@ def main() -> None:
                 energy = _read_hits(tcm, "hit", "energy")
 
                 # we want to only store hits from events in ON and AC detectors and above
-                # our energy threshold
-                hitsel = (usability != OFF) & (energy > geds_energy_thr_kev)
+                # our energy threshold. With the surface steps, the hits below the
+                # threshold are kept too: the pdf tier recomputes their energy for
+                # other dead-layer models and then applies the threshold
+                above_thr = (usability != OFF) & (energy > geds_energy_thr_kev)
+                hitsel = (usability != OFF) if store_surface_steps else above_thr
 
                 # we want to still be able to know which detectors are ON (and not AC)
                 out_table.add_field("geds/quality", Table(size=len(unified_tcm)))
@@ -465,7 +472,7 @@ def main() -> None:
                     "geds/energy_sum",
                     Array(
                         np.asarray(
-                            ak.sum(energy[hitsel & (usability == ON)], axis=-1),
+                            ak.sum(energy[above_thr & (usability == ON)], axis=-1),
                             dtype=np.float32,
                         ),
                         attrs={"units": "keV"},
@@ -575,8 +582,36 @@ def main() -> None:
                         "geds/psd/pulse_lib/is_high_aoe",
                         VectorOfVectors(is_high_aoe[hitsel]),
                     )
+                # energy depositions near the n+ surface, one list per hit
+                if store_surface_steps:
+                    out_table.add_field("geds/surface", Table(size=len(unified_tcm)))
+                    for field, units in (
+                        ("edep", "keV"),
+                        ("distance_to_nplus", "mm"),
+                        ("energy_bulk", "keV"),
+                    ):
+                        data = reboost.units.units_conv_ak(
+                            _read_hits(tcm, "hit", f"surface/{field}"), units
+                        )
+                        if field != "energy_bulk" and data.ndim == 2:
+                            # no hits in this chunk: the empty hit lists still
+                            # need the type of step lists to append to the file
+                            data = ak.unflatten(
+                                ak.unflatten(
+                                    np.zeros(0, np.float32), np.zeros(0, np.int64)
+                                ),
+                                ak.num(data),
+                            )
+                        out_table.add_field(
+                            f"geds/surface/{field}",
+                            VectorOfVectors(
+                                ak.values_astype(data[hitsel], np.float32),
+                                attrs={"units": units},
+                            ),
+                        )
+
                 # compute multiplicity
-                geds_multiplicity = ak.sum(hitsel, axis=-1)
+                geds_multiplicity = ak.sum(above_thr, axis=-1)
                 out_table.add_field("geds/multiplicity", Array(geds_multiplicity))
             else:
                 geds_multiplicity = ak.Array(np.zeros(len(unified_tcm), dtype=np.int64))
