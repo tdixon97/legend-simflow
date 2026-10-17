@@ -507,6 +507,14 @@ aoemeanmod_default:
   the linear ramp in charge collection efficiency starts, between `0` (HPGe
   surface, ramp begins immediately) and `1` (ramp begins only at the full charge
   collection depth, i.e. no partial collection).
+- `store_surface_steps` (bool, default `false`) — store the energy depositions
+  near the n+ surface, so that the hit energies can be recomputed for other
+  dead-layer models (see {ref}`hit-tier-output`). The `evt` tier then also keeps
+  the hits below its energy threshold (see {ref}`evt-tier`).
+- `surface_depth_in_mm` (float, default `3`) — depositions closer than this
+  distance to the n+ surface are stored in the `surface` subtable. It must
+  exceed the largest FCCD applied later: deeper depositions count as fully
+  active.
 - `buffer_len` (str) — LH5 read chunk size (e.g. `"500*MB"`). Controls memory
   usage during processing; does not affect the output.
 - `eresmod_default` — energy resolution model applied to non-ON detectors. See
