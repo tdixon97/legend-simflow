@@ -84,6 +84,86 @@ def apply_path_defaults(paths: dict) -> None:
         paths["pulse_shape_lib"] = paths["pars"] / "hpge/pulse_shape_lib"
 
 
+def _default_path_pairs(
+    paths: dict, workflow_basedir: str | Path
+) -> list[tuple[Path, Path]]:
+    """Pair each ``paths`` entry with its default location from ``templates/default.yaml``."""
+    template = Path(workflow_basedir).parent / "templates" / "default.yaml"
+    if not template.is_file():
+        return []
+
+    default_cfg = yaml.safe_load(template.read_text())
+    if not isinstance(default_cfg, dict):
+        return []
+    ldfs.subst_vars(
+        default_cfg,
+        var_values={"_": str(Path.cwd().resolve())},
+        ignore_missing=True,
+    )
+    default_paths_d = default_cfg.get("paths", {})
+    # mirrors apply_path_defaults() — geom/dtmaps are commented out by default
+    if "pars" in default_paths_d:
+        default_paths_d.setdefault("geom", str(Path(default_paths_d["pars"]) / "geom"))
+        default_paths_d.setdefault(
+            "dtmaps", str(Path(default_paths_d["pars"]) / "hpge/dtmaps")
+        )
+
+    candidates: list[tuple[Any, Any]] = []
+    for tier_name, current in paths.get("tier", {}).items():
+        candidates.append((current, (default_paths_d.get("tier") or {}).get(tier_name)))
+    for key in ("pars", "macros", "geom", "dtmaps"):
+        if key in paths:
+            candidates.append((paths[key], default_paths_d.get(key)))
+
+    # normalize away the NERSC /dvs_ro read-only mount: the canonical
+    # filesystem location is /global, and using /dvs_ro here would force
+    # the relative symlink target up to / and back down through the mount.
+    return [
+        (Path(nersc.undo_dvs_ro(str(c))), Path(nersc.undo_dvs_ro(str(d))))
+        for c, d in candidates
+        if d is not None
+    ]
+
+
+def remove_stale_path_links(
+    paths: dict,
+    workflow_basedir: str | Path,
+    *,
+    logger: logging.Logger | None = None,
+) -> None:
+    """Remove symlinks left at default locations by an earlier override.
+
+    :func:`link_external_paths` puts a symlink at the default location of an
+    overridden ``paths`` entry. When the entry is set back to its default,
+    this symlink would send the output files into the other production, so it
+    is removed with a warning. Must run before the paths are resolved, since
+    :meth:`pathlib.Path.resolve` follows symlinks.
+
+    Parameters
+    ----------
+    paths
+        The ``paths`` section of the Simflow configuration, with ``$_``
+        already substituted.
+    workflow_basedir
+        Snakemake workflow basedir, used to locate the default template.
+    logger
+        Logger to use for status messages. Defaults to the module logger.
+    """
+    log_ = logger if logger is not None else log
+
+    for current, default in _default_path_pairs(paths, workflow_basedir):
+        if not default.is_symlink():
+            continue
+        # `os.path.abspath` (not Path.resolve) on purpose: don't follow symlinks
+        if os.path.abspath(current) == os.path.abspath(default):  # noqa: PTH100
+            msg = (
+                f"{default} is a symlink to {default.readlink()}, left from an earlier "
+                "run where this path was overridden; removing it"
+            )
+            log_.warning(msg)
+            default.unlink()
+
+
 def link_external_paths(
     config: AttrsDict,
     workflow_basedir: str | Path,
@@ -136,42 +216,8 @@ def link_external_paths(
 
     """
     log_ = logger if logger is not None else log
-    template = Path(workflow_basedir).parent / "templates" / "default.yaml"
-    if not template.is_file():
-        return
 
-    default_cfg = yaml.safe_load(template.read_text())
-    if not isinstance(default_cfg, dict):
-        return
-    ldfs.subst_vars(
-        default_cfg,
-        var_values={"_": str(Path.cwd().resolve())},
-        ignore_missing=True,
-    )
-    default_paths_d = default_cfg.get("paths", {})
-    # mirrors apply_path_defaults() — geom/dtmaps are commented out by default
-    if "pars" in default_paths_d:
-        default_paths_d.setdefault("geom", str(Path(default_paths_d["pars"]) / "geom"))
-        default_paths_d.setdefault(
-            "dtmaps", str(Path(default_paths_d["pars"]) / "hpge/dtmaps")
-        )
-
-    candidates: list[tuple[Any, Any]] = []
-    for tier_name, current in config.paths.get("tier", {}).items():
-        candidates.append((current, (default_paths_d.get("tier") or {}).get(tier_name)))
-    for key in ("pars", "macros", "geom", "dtmaps"):
-        if key in config.paths:
-            candidates.append((config.paths[key], default_paths_d.get(key)))
-
-    for current_str, default_str in candidates:
-        if default_str is None:
-            continue
-        # normalize away the NERSC /dvs_ro read-only mount: the canonical
-        # filesystem location is /global, and using /dvs_ro here would force
-        # the relative symlink target up to / and back down through the mount.
-        current = Path(nersc.undo_dvs_ro(str(current_str)))
-        default = Path(nersc.undo_dvs_ro(str(default_str)))
-
+    for current, default in _default_path_pairs(config.paths, workflow_basedir):
         # compare absolute paths without resolving symlinks: otherwise a
         # symlink we just installed at `default` would make resolve() equal
         # current and look like a "no override".
@@ -282,6 +328,9 @@ def init_simflow_context(
             ldfs.workflow.utils.subst_vars_in_snakemake_config(workflow, raw_config)
 
         config = AttrsDict(raw_config)
+
+        if workflow is not None:
+            remove_stale_path_links(config.paths, workflow.basedir, logger=log_)
 
         # convert all strings in the "paths" block to pathlib.Path
         config["paths"] = _make_path(config.paths)

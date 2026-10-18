@@ -673,6 +673,42 @@ def test_link_external_paths_removes_stale_symlink(link_setup, tmp_path):
     assert not default.exists()
 
 
+def test_remove_stale_path_links_removes_link_at_default(link_setup, tmp_path):
+    workflow_basedir, cycle, config = link_setup
+
+    # left from an earlier run, where tier.opt pointed at another production
+    other_prod = tmp_path / "other_prod" / "opt"
+    other_prod.mkdir(parents=True)
+    (other_prod / "data.lh5").touch()
+    default = cycle / "generated/tier/opt"
+    default.parent.mkdir(parents=True)
+    default.symlink_to(other_prod)
+
+    # tier.opt is now back at its default location
+    utils.remove_stale_path_links(config.paths, workflow_basedir)
+
+    assert not default.is_symlink()
+    assert (other_prod / "data.lh5").is_file()
+
+
+def test_remove_stale_path_links_keeps_overrides_and_directories(link_setup, tmp_path):
+    workflow_basedir, cycle, config = link_setup
+
+    ext_hit = tmp_path / "external" / "hit"
+    ext_hit.mkdir(parents=True)
+    config.paths.tier["hit"] = ext_hit
+    utils.link_external_paths(config, workflow_basedir)
+
+    real = cycle / "generated/tier/evt"
+    real.mkdir(parents=True)
+
+    utils.remove_stale_path_links(config.paths, workflow_basedir)
+
+    assert (cycle / "generated/tier/hit").is_symlink()
+    assert real.is_dir()
+    assert not real.is_symlink()
+
+
 def test_link_external_paths_geom_dtmaps_default(link_setup, tmp_path):
     workflow_basedir, cycle, config = link_setup
     del config.paths["pars"]
