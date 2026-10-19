@@ -92,4 +92,5 @@ def select_geds_hit(evt: ak.Array, rawid: int) -> ak.Array:
             return field
         return ak.flatten(field[is_det], axis=1)
 
-    return ak.with_field(evt, _select(evt.geds), "geds")
+    # packed: repeated computations on the steps (e.g. a PDF grid scan) run faster
+    return ak.with_field(evt, ak.to_packed(_select(evt.geds)), "geds")
