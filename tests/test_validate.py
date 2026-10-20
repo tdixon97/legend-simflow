@@ -169,11 +169,16 @@ def test_l200data_layout_skipped_without_l200data(fresh_config):
 
 def test_detinfo_against_l200data(fresh_config, monkeypatch, caplog):
     config = fresh_config
-    sim = {"usability": {"l200-p02-r000-phy": {"V00048A": "on", "V00048B": "off"}}}
+    sim = {
+        "usability": {
+            "l200-p02-r000-phy": {"V00048A": "on", "V00048B": "off", "PMT105": "off"}
+        }
+    }
     data = {
         "l200-p02-r000-phy": {
             "V00048A": {"usability": "on"},
             "V00048B": {"usability": "off"},
+            "PMT105": {"usability": "on"},
         }
     }
 
@@ -198,6 +203,7 @@ def test_detinfo_against_l200data(fresh_config, monkeypatch, caplog):
         "data production has 'on'"
     ) in str(err.value)
     assert "V00048A" not in str(err.value)
+    assert "PMT105" not in str(err.value)
 
     config["validate_l200data"] = False
     with caplog.at_level(logging.WARNING):

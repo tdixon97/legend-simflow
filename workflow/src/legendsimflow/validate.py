@@ -438,7 +438,7 @@ def detinfo_against_l200data(
 ) -> None:
     """Check that the detector usabilities match the data production metadata.
 
-    Does nothing if ``paths.l200data`` is not set, or if ``validate_l200data``
+    PMTs (names starting with ``PMT``) are not checked. Does nothing if ``paths.l200data`` is not set, or if ``validate_l200data``
     is false.
 
     Parameters
@@ -475,6 +475,8 @@ def detinfo_against_l200data(
             sim_run = sim.get(runid, {})
             data_run = data.get(runid, {})
             for det in sorted(set(sim_run) | set(data_run)):
+                if det.startswith("PMT"):
+                    continue
                 sim_val = sim_run.get(det, "<missing>")
                 data_val = data_run.get(det, "<missing>")
                 if sim_val != data_val:
@@ -482,6 +484,9 @@ def detinfo_against_l200data(
                         f"  {runid} {det}: Simflow metadata has {sim_val!r}, "
                         f"data production has {data_val!r}"
                     )
+
+        if not diffs:
+            continue
 
         msg = (
             f"'{flag}' differs between the Simflow metadata and the data "
