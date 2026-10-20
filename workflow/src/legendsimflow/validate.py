@@ -363,7 +363,8 @@ def _data_problems(
             first = first or first_files[folder]
 
         if first is not None and name:
-            with h5py.File(first, "r") as f:
+            # /dvs_ro at NERSC does not support file locks
+            with h5py.File(first, "r", locking=False) as f:
                 problems += check_spec(
                     f,
                     {k.format(rawid=rawid): v for k, v in specs[name].items()},
