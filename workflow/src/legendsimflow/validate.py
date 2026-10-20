@@ -25,7 +25,7 @@ import logging
 from collections.abc import Mapping
 from pathlib import Path
 
-import h5py
+import lh5
 from dbetto import AttrsDict, TextDB
 from dbetto.catalog import Catalog
 from legendmeta import LegendMetadata
@@ -363,8 +363,7 @@ def _data_problems(
             first = first or first_files[folder]
 
         if first is not None and name:
-            # /dvs_ro at NERSC does not support file locks
-            with h5py.File(first, "r", locking=False) as f:
+            with lh5.LH5Store().gimme_file(str(first), "r") as f:
                 problems += check_spec(
                     f,
                     {k.format(rawid=rawid): v for k, v in specs[name].items()},
