@@ -276,7 +276,7 @@ def reference_cal_run(metadata: MetadataRepository, runid: str) -> str:
     exp, period, run, datatype = re.split(r"\W+", runid)
 
     msg = f"looking for reference calibration run for {runid}"
-    log.info(msg)
+    log.debug(msg)
 
     # TODO: this is a temporary workaround for the fact that p16-r007 and later runs should use p16-r006
     if period == "p16" and (run > "r006"):
