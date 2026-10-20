@@ -174,8 +174,9 @@ test = { features = ["test"], solve-group = "default" }
 [tool.pixi.tasks]
 snakemake = { cmd = "snakemake", depends-on = ["warmup"] }
 snakemake-nersc = { cmd = "snakemake-nersc", depends-on = ["warmup"] }
-dry = { cmd = "snakemake --logger rich --dry-run" }
+dry = { cmd = "snakemake --logger rich --dry-run", depends-on = ["validate"] }
 touch = { cmd = "snakemake --logger rich --touch" }
+validate = { cmd = "python -m legendsimflow.validate" }
 
 tier-opt = { cmd = "python -m legendsimflow.scripts.tier.opt" }
 tier-hit = { cmd = "python -m legendsimflow.scripts.tier.hit" }

@@ -494,3 +494,8 @@ def detinfo_against_l200data(
             + "\n".join(diffs)
         )
         raise SimflowConfigError(msg)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    l200data_layout(utils.init_simflow_context("simflow-config.yaml").config)

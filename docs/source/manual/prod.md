@@ -22,7 +22,8 @@ If no system-specific profile is needed, omit `--profile` (defaults to
 > pixi run prod
 ```
 
-To preview what Snakemake would do without executing anything, use `dry`:
+To preview what Snakemake would do without executing anything, use `dry`. It
+first checks the data production at `paths.l200data`, as a real run does:
 
 ```console
 > pixi run dry

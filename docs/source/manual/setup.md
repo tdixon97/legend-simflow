@@ -70,8 +70,9 @@ and of the optional fields of the settings files in the Simflow metadata (see
   `true`). The Simflow aborts if one of the following checks fails. If `false`,
   the checks are skipped and a warning says that the data production is not
   validated. The checks are also skipped if `paths.l200data` is not set.
-  - Before any job starts: the data production has the files and folders the
-    Simflow reads (see {func}`legendsimflow.validate.l200data_layout`).
+  - Before any job starts, and with `pixi run validate` or `pixi run dry`: the
+    data production has the files and folders the Simflow reads (see
+    {func}`legendsimflow.validate.l200data_layout`).
   - When the detector usabilities are cached: the HPGe `usability` and
     `psd_usability` flags in the Simflow metadata are the same as in the data
     production metadata (`{paths.l200data}/inputs`).
@@ -163,7 +164,10 @@ To load the software, just execute `pixi shell`. Alternatively, use the provided
 pixi tasks to run the workflow without entering a shell:
 
 - `pixi run prod [--profile <name>]` — run a full production (recommended)
-- `pixi run dry` — preview what Snakemake would do without executing
+- `pixi run dry` — preview what Snakemake would do without executing, after
+  running `validate`
+- `pixi run validate` — check the data production at `paths.l200data` (see
+  `validate_l200data` above)
 - `pixi run touch` — mark all outputs as up-to-date without re-running jobs
 - `pixi run snakemake [ARGS]` — pass arbitrary arguments directly to Snakemake
 
