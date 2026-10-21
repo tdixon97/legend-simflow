@@ -76,14 +76,11 @@ def main() -> None:
 
     log.info("... reading data from %s", cvt_file)
 
-    # detect what data is available in the cvt file
-    _cvt_file_str = str(cvt_file)
-    _evt_groups = {k.removeprefix("evt/") for k in lh5.ls(_cvt_file_str, "evt/")}
-    has_geds = "geds" in _evt_groups
-    has_spms_coinc = "coincident" in _evt_groups and "spms" in {
-        k.removeprefix("evt/coincident/")
-        for k in lh5.ls(_cvt_file_str, "evt/coincident/")
-    }
+    # the data in the cvt file, as written by the evt tier
+    tier_evt_settings = get_tier_settings(config, "evt")
+    tier_hit_settings = get_tier_settings(config, "hit")
+    has_geds = not tier_evt_settings.skip_hit
+    has_spms_coinc = not tier_evt_settings.skip_opt
 
     # resolve detector-group regexes against the name to UID map written at
     # evt-tier build time; the implicit "all" group is always emitted.
@@ -112,7 +109,7 @@ def main() -> None:
     iterator = []
     if has_geds:
         iterator = lh5.LH5Iterator(str(cvt_file), "evt", buffer_len=buffer_len)
-        geds_energy_thr_kev = get_tier_settings(config, "evt").geds_energy_thr_kev
+        geds_energy_thr_kev = tier_evt_settings.geds_energy_thr_kev
 
     # the number of simulated primary events is written by remage at the root
     # of each stp file, forwarded through the evt tier and summed over all jobs
@@ -139,15 +136,11 @@ def main() -> None:
 
     # the A/E categories come from the pulse-shape library when it was
     # simulated, otherwise from the single template (which has no high-side
-    # cut). Without simulated PSD there is no geds/psd and no A/E level.
-    geds_fields = set(lh5.ls(_cvt_file_str, "evt/geds/")) if has_geds else set()
-    psd_models = set()
-    if "evt/geds/psd" in geds_fields:
-        psd_models = set(lh5.ls(_cvt_file_str, "evt/geds/psd/"))
+    # cut). Without simulated PSD there is no A/E level.
     aoe_model = None
-    if "evt/geds/psd/pulse_lib" in psd_models:
+    if has_geds and tier_hit_settings.simulate_psd_with_psl:
         aoe_model = "pulse_lib"
-    elif "evt/geds/psd/single_temp" in psd_models:
+    elif has_geds and tier_hit_settings.simulate_psd:
         aoe_model = "single_temp"
     if aoe_model is not None:
         aoe_level = {}
@@ -160,7 +153,7 @@ def main() -> None:
 
     fccd_thr = tier_pdf_settings.fccd_tag_energy_thr_kev
     if has_geds and fccd_thr is not None:
-        if "evt/geds/surface" not in geds_fields:
+        if not tier_hit_settings.store_surface_steps:
             msg = (
                 "fccd_tag_energy_thr_kev needs the steps near the n+ surface, "
                 "run the hit tier with store_surface_steps"
@@ -174,7 +167,7 @@ def main() -> None:
         )
 
         # FCCD of each detector in mm, in the order of the sorted UIDs
-        surface_depth = get_tier_settings(config, "hit").surface_depth_in_mm
+        surface_depth = tier_hit_settings.surface_depth_in_mm
         names = sorted(name_to_uid, key=name_to_uid.get)
         sorted_uids = np.array([name_to_uid[n] for n in names], dtype=np.int64)
         fccd_mm = np.zeros(len(names))
