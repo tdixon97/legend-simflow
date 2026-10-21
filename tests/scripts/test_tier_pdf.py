@@ -4,6 +4,7 @@ import shutil
 import sys
 from pathlib import Path
 
+import awkward as ak
 import h5py
 import lh5
 import numpy as np
@@ -229,6 +230,64 @@ def test_pdf_pulse_lib_cuts(tmp_path, monkeypatch):
     for aoe, (n_no_light, n_light) in expected.items():
         assert _sum(f"pdf/mul1/not_spms_coincident/{aoe}/all") == n_no_light, aoe
         assert _sum(f"pdf/mul1/is_spms_coincident/{aoe}/all") == n_light, aoe
+
+
+def _make_cvt_file_surface(path: Path) -> None:
+    """Write a cvt file with surface steps and hits below the 25 keV threshold."""
+    # a "-" hit is below threshold and in an AC detector, it must be ignored
+    # - event 0: m1, 1000 keV
+    # - event 1: m1, 1000 keV
+    # - event 2: m1, 800 keV + 10 keV(-)
+    # - event 3: m2, 300 + 400 keV + 5 keV(-)
+    geds = Table(
+        col_dict={
+            "energy": VectorOfVectors(
+                data=[[1000.0], [1000.0], [800.0, 10.0], [300.0, 400.0, 5.0]]
+            ),
+            "rawid": VectorOfVectors(data=[[1], [1], [1, 2], [1, 2, 2]]),
+            "quality": Table(
+                col_dict={
+                    "is_good_channel": VectorOfVectors(
+                        data=[[True], [True], [True, False], [True, True, False]]
+                    )
+                }
+            ),
+            "multiplicity": Array(np.array([1, 1, 1, 2], dtype=np.int32)),
+            "surface": Table(
+                col_dict={
+                    "edep": VectorOfVectors(
+                        ak.Array(
+                            [[[5.0, 20.0]], [[15.0]], [[1.0], [50.0]], [[], [], []]]
+                        )
+                    ),
+                    "distance_to_nplus": VectorOfVectors(
+                        ak.Array([[[0.5, 2.0]], [[0.3]], [[1.0], [0.1]], [[], [], []]])
+                    ),
+                }
+            ),
+        }
+    )
+    lh5.write(Table(col_dict={"geds": geds}), "evt", path, wo_mode="write_safe")
+    _write_cvt_root(path, ["V99000A", "B99000A"], [1, 2])
+
+
+def test_pdf_energy_threshold(tmp_path, monkeypatch):
+    cvt_file = tmp_path / "cvt.lh5"
+    _make_cvt_file_surface(cvt_file)
+    pdf_file = _run_pdf(tmp_path, monkeypatch, cvt_file)
+
+    def _hist(path):
+        return lh5.read_as(path, pdf_file, "hist")
+
+    # no SiPM or PSD data: no category levels
+    mul1 = _hist("pdf/mul1/all")
+    assert mul1.sum() == 3
+    assert mul1[10j] == 0
+    assert mul1[800j] == 1
+
+    mul2 = _hist("pdf/mul2")
+    assert mul2.sum() == 1
+    assert mul2[300j, 400j] == 1
 
 
 def _make_cvt_file_no_spms(path: Path) -> None:
