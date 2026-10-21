@@ -123,8 +123,15 @@ def main() -> None:
     # 1 keV/bin over 0-6000 keV; boost-histogram only provides Double (float64) storage
     h1 = hist.new.Reg(6000, 0, 6000).Double
 
+    _geds_fields = set()
+    if has_geds:
+        _geds_fields = {
+            k.removeprefix("evt/geds/") for k in lh5.ls(_cvt_file_str, "evt/geds/")
+        }
+        geds_energy_thr_kev = get_tier_settings(config, "evt").geds_energy_thr_kev
+
     psd_models = set()
-    if has_geds and "evt/geds/psd" in lh5.ls(_cvt_file_str, "evt/geds/"):
+    if "psd" in _geds_fields:
         psd_models = {
             k.removeprefix("evt/geds/psd/")
             for k in lh5.ls(_cvt_file_str, "evt/geds/psd/")
@@ -179,18 +186,27 @@ def main() -> None:
         data = chunk.view_as("ak")
 
         if has_geds:
+            # with store_surface_steps the evt tier keeps the hits below the
+            # energy threshold: drop them from every per-hit field used here
+            above_thr = data.geds.energy > geds_energy_thr_kev
+            energy = data.geds.energy[above_thr]
+
             # awkward 2.x has no ak.isin: build per-group masks via flatten / np.isin / unflatten.
-            counts = ak.num(data.geds.rawid)
-            flat_uid = ak.flatten(data.geds.rawid)
+            counts = ak.num(energy)
+            flat_uid = ak.flatten(data.geds.rawid[above_thr])
             det_in_group = {
                 g: ak.unflatten(np.isin(flat_uid, uids), counts)
                 for g, uids in group_uids.items()
             }
 
-            good_channel_mask = ak.all(data.geds.quality.is_good_channel, axis=-1)
+            good_channel_mask = ak.all(
+                data.geds.quality.is_good_channel[above_thr], axis=-1
+            )
 
             m1_event_mask = (data.geds.multiplicity == 1) & good_channel_mask
             data_m1 = data[m1_event_mask]
+            above_m1 = above_thr[m1_event_mask]
+            energy_m1 = energy[m1_event_mask]
             det_m1 = {g: m[m1_event_mask] for g, m in det_in_group.items()}
 
             # event masks of the categories
@@ -200,11 +216,12 @@ def main() -> None:
                 in_category["not_spms_coincident"] = ~data_m1.coincident.spms
             if aoe_model is not None:
                 psd = data_m1.geds.psd
-                valid = ak.all(psd.is_good & psd[aoe_model].has_aoe, axis=-1)
-                single_site = ak.all(psd[aoe_model].is_single_site, axis=-1)
+                aoe = psd[aoe_model]
+                valid = ak.all(psd.is_good[above_m1] & aoe.has_aoe[above_m1], axis=-1)
+                single_site = ak.all(aoe.is_single_site[above_m1], axis=-1)
                 high = ak.zeros_like(valid)
                 if aoe_model == "pulse_lib":
-                    high = valid & ak.all(psd.pulse_lib.is_high_aoe, axis=-1)
+                    high = valid & ak.all(aoe.is_high_aoe[above_m1], axis=-1)
                     in_category["is_high_aoe"] = high
                 in_category["is_ss_aoe"] = valid & ~high & single_site
                 in_category["is_low_aoe"] = valid & ~high & ~single_site
@@ -214,16 +231,12 @@ def main() -> None:
                 sel = np.ones(len(data_m1), dtype=bool)
                 for c in path.split("/")[1:]:
                     sel = sel & in_category[c]
-                energy = data_m1.geds.energy[sel]
                 for g, h in per_group_hists.items():
-                    h.fill(ak.flatten(energy[det_m1[g][sel]]))
+                    h.fill(ak.flatten(energy_m1[sel][det_m1[g][sel]]))
 
-            data_m2 = data[(data.geds.multiplicity == 2) & good_channel_mask]
+            energy_m2 = energy[(data.geds.multiplicity == 2) & good_channel_mask]
             assert mul2_hist is not None
-            mul2_hist.fill(
-                ak.min(data_m2.geds.energy, axis=-1),
-                ak.max(data_m2.geds.energy, axis=-1),
-            )
+            mul2_hist.fill(ak.min(energy_m2, axis=-1), ak.max(energy_m2, axis=-1))
 
     log.info("... convert histograms to lgdo")
 

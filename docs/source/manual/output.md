@@ -384,7 +384,8 @@ pdf/mul1/<lar_category>/<aoe_category>/<group>
 
 Only multiplicity-1 events are histogrammed in 1D: exactly one detector fired
 (`geds.multiplicity == 1`), and it is ON (not AC or OFF, i.e.
-`geds.quality.is_good_channel` is `True`). The category levels below `mul1`
+`geds.quality.is_good_channel` is `True`). Hits below the `evt` tier energy
+threshold `geds_energy_thr_kev` are ignored. The category levels below `mul1`
 split these events by the LAr veto and by A/E. Every event falls in exactly one
 category of each level, so the histograms do not overlap.
 
