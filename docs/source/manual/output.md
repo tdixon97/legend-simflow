@@ -364,9 +364,8 @@ file containing a set of histograms, each corresponding to a different event
 selection and detector group, and a scalar recording the total number of
 simulated primary events.
 
-The histograms apply a sequence of analysis cuts — multiplicity, LAr
-anti-coincidence, and pulse-shape discrimination — to produce PDFs for the most
-common LEGEND-200 analysis channels. All histograms carry a `description`
+The histograms split the events into independent categories by multiplicity, LAr
+veto and pulse-shape discrimination (PSD). All histograms carry a `description`
 attribute in the LH5 attrs.
 
 ### Root-level fields
@@ -380,85 +379,75 @@ attribute in the LH5 attrs.
 The 1D histograms are stored at paths of the form
 
 ```text
-pdf/<level_1>/<level_2>/.../<level_n>/<group>
+pdf/mul1/<lar_category>/<aoe_category>/<group>
 ```
 
-Each level is one event selection, and a histogram contains the events that
-satisfy all levels on its path. A level is either `<cut>`, for events passing
-the cut, or `not_<cut>`, for events failing it. The levels always appear in the
-order `mul1`, `lar`, PSD cut. A cut absent from a path is not applied.
+Only multiplicity-1 events are histogrammed in 1D: exactly one detector fired
+(`geds.multiplicity == 1`), and it is ON (not AC or OFF, i.e.
+`geds.quality.is_good_channel` is `True`). The category levels below `mul1`
+split these events by the LAr veto and by A/E. Every event falls in exactly one
+category of each level, so the histograms do not overlap.
 
 The last path element is the detector group. Each group is a `Histogram` of the
 energies (in keV, 1 keV bins from 0 to 6000 keV) of the hits in the detectors of
-that group. The cuts select whole events, independent of the group. The groups
-are configured with the `detector_groups` setting (see
+that group. The categories select whole events, independent of the group. The
+groups are configured with the `detector_groups` setting (see
 {ref}`pdf-tier-settings`), and the `all` group with every detector is always
-present. For example, with `detector_groups: {icpc: "V.*", bege: "B.*"}`, the
-output contains `pdf/mul1/lar/icpc`, `pdf/mul1/lar/bege` and `pdf/mul1/lar/all`.
-A level holds the group histograms of its selection next to the deeper levels,
-so group names cannot be cut levels (`lar`, `not_lar`, `aoe_st`, ...).
+present. For example, with `detector_groups: {icpc: "V.*", bege: "B.*"}`, each
+category contains `icpc`, `bege` and `all`.
 
-Example, with the `all` group only:
+Example with the pulse-shape library and the `all` group only:
 
 ```text
 pdf/
-├── hit/all
 ├── mul2
 └── mul1/
-    ├── all
-    ├── lar/
-    │   ├── all
-    │   └── aoe_psl/all
-    ├── not_lar/all
-    ├── aoe_psl/all
-    └── not_aoe_psl/all
+    ├── is_spms_coincident/
+    │   ├── is_high_aoe/all
+    │   ├── is_ss_aoe/all
+    │   ├── is_low_aoe/all
+    │   └── is_invalid_aoe/all
+    └── not_spms_coincident/
+        ├── is_high_aoe/all
+        ├── is_ss_aoe/all
+        ├── is_low_aoe/all
+        └── is_invalid_aoe/all
 ```
 
-`pdf/mul1/lar/aoe_psl/all` contains multiplicity-1 events with no light in the
-LAr instrumentation that pass both A/E cuts.
+#### Categories
 
-#### Levels
+| Level | Category              | Selection                                                                                     |
+| ----- | --------------------- | --------------------------------------------------------------------------------------------- |
+| LAr   | `is_spms_coincident`  | light seen by the SiPMs (`coincident.spms` is `True`), i.e. the event fails the LAr veto      |
+| LAr   | `not_spms_coincident` | no light seen by the SiPMs (`coincident.spms` is `False`), i.e. the event passes the LAr veto |
+| A/E   | `is_high_aoe`         | A/E above the high-side cut (`is_high_aoe`). Pulse-shape library only                         |
+| A/E   | `is_ss_aoe`           | single-site: A/E above the low-side cut (`is_single_site`) and not above the high-side cut    |
+| A/E   | `is_low_aoe`          | multi-site: A/E below the low-side cut and not above the high-side cut                        |
+| A/E   | `is_invalid_aoe`      | no A/E available: `psd.is_good` or `has_aoe` is `False`                                       |
 
-All selections require every hit in the event to be in an ON detector (not AC or
-OFF), i.e. `geds.quality.is_good_channel` is `True`.
+The A/E flags are taken from the pulse-shape library model (`psd.pulse_lib`)
+when the `hit` tier runs with `simulate_psd_with_psl`, and otherwise from the
+single-template model (`psd.single_temp`) when it runs with `simulate_psd` (see
+{ref}`hit-tier-settings`). The single-template model has no high-side cut, so
+`is_high_aoe` is absent. This gives 8 categories with the pulse-shape library
+and 6 with the single template.
 
-| Level  | Selection                                                                                                                                          |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `hit`  | All HPGe energy deposits, no multiplicity requirement. Top level only, no further levels below.                                                    |
-| `mul1` | Multiplicity-1 events: exactly one ON detector fired (`geds.multiplicity == 1`). All other levels are below `mul1`.                                |
-| `lar`  | LAr anti-coincidence: no light seen by the SiPMs (`coincident.spms` is `False`). `not_lar` selects events with light. Present only with SiPM data. |
-| PSD    | PSD cuts, see the table below. Each requires `psd.is_good` and the `has_aoe` flag of its A/E model for all hits, plus the cut condition.           |
+`is_invalid_aoe` holds events with a detector that is ON with valid PSD in data,
+but whose PSD response could not be simulated (e.g. because it is not included
+in the simulation model), or that has no valid PSD in data. An analysis applying
+an A/E cut treats these events as background.
 
-| PSD level      | A/E model           | Condition on all hits                                    |
-| -------------- | ------------------- | -------------------------------------------------------- |
-| `aoe_st`       | single template     | `psd.single_temp.is_single_site` (low-side A/E cut)      |
-| `aoe_psl_low`  | pulse-shape library | `psd.pulse_lib.is_single_site` (low-side A/E cut)        |
-| `aoe_psl_high` | pulse-shape library | not `psd.pulse_lib.is_high_aoe` (high-side A/E cut)      |
-| `aoe_psl`      | pulse-shape library | `psd.pulse_lib.is_bb_like` (low- and high-side A/E cuts) |
+A level is omitted when its data is missing: the LAr level without SiPM data,
+the A/E level when no PSD is simulated. For example, without SiPM data the paths
+are `pdf/mul1/<aoe_category>/<group>`.
 
-The single-template levels are present when the `hit` tier runs with
-`simulate_psd`, the pulse-shape library levels when it runs with
-`simulate_psd_with_psl` (see {ref}`hit-tier-settings`).
+:::{tip}
 
-The following paths are written, for each PSD level `<aoe>` available:
-
-| Path                           | Selection                                        |
-| ------------------------------ | ------------------------------------------------ |
-| `hit`                          | all HPGe energy deposits                         |
-| `mul1`                         | multiplicity 1                                   |
-| `mul1/lar`, `mul1/not_lar`     | multiplicity 1, passing / failing the LAr veto   |
-| `mul1/<aoe>`, `mul1/not_<aoe>` | multiplicity 1, passing / failing the PSD cut    |
-| `mul1/lar/<aoe>`               | multiplicity 1, passing the LAr veto and PSD cut |
-
-:::{warning}
-
-A PSD cut has three outcomes. Events with `psd.is_good` or `has_aoe` set to
-`False` for any hit pass neither `<aoe>` nor `not_<aoe>`. This is the case when
-a detector is ON with valid PSD in data but its PSD response could not be
-simulated (e.g. because it is not included in the simulation model). These
-events are treated as background: rather than keeping events we cannot
-characterise, we cut them. As a consequence, `mul1/<aoe>` and `mul1/not_<aoe>`
-do not add up to `mul1`.
+Any other selection is a sum of categories. For example, the spectrum after the
+LAr veto and the low- and high-side A/E cuts is
+`mul1/not_spms_coincident/is_ss_aoe`. The spectrum after the LAr veto alone is
+the sum of all A/E categories below `mul1/not_spms_coincident`, and the
+multiplicity-1 spectrum is the sum of all categories.
 
 :::
 

@@ -16,6 +16,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import argparse
+import itertools
 import re
 
 import awkward as ak
@@ -122,71 +123,46 @@ def main() -> None:
     # 1 keV/bin over 0-6000 keV; boost-histogram only provides Double (float64) storage
     h1 = hist.new.Reg(6000, 0, 6000).Double
 
-    # PSD cuts as (A/E model, flag, pass if flag is False, description). The
-    # flags are defined in legendsimflow.reboost.
-    psd_cuts = {
-        "aoe_st": (
-            "single_temp",
-            "is_single_site",
-            False,
-            "low-side A/E cut (single template)",
-        ),
-        "aoe_psl_low": (
-            "pulse_lib",
-            "is_single_site",
-            False,
-            "low-side A/E cut (pulse library)",
-        ),
-        "aoe_psl_high": (
-            "pulse_lib",
-            "is_high_aoe",
-            True,
-            "high-side A/E cut (pulse library)",
-        ),
-        "aoe_psl": (
-            "pulse_lib",
-            "is_bb_like",
-            False,
-            "low- and high-side A/E cuts (pulse library)",
-        ),
-    }
-
-    # the per-group histograms sit next to the deeper cut levels in the output
-    cut_levels = {"lar", *psd_cuts}
-    clash = set(groups) & (cut_levels | {f"not_{c}" for c in cut_levels})
-    if clash:
-        msg = f"detector group names {sorted(clash)} are reserved for cut levels"
-        raise ValueError(msg)
-
     psd_models = set()
     if has_geds and "evt/geds/psd" in lh5.ls(_cvt_file_str, "evt/geds/"):
         psd_models = {
             k.removeprefix("evt/geds/psd/")
             for k in lh5.ls(_cvt_file_str, "evt/geds/psd/")
         }
-    psd_cuts = {c: v for c, v in psd_cuts.items() if v[0] in psd_models}
+    # the A/E categories come from the pulse-shape library when it was
+    # simulated, otherwise from the single template (which has no high-side cut)
+    aoe_model = None
+    if "pulse_lib" in psd_models:
+        aoe_model = "pulse_lib"
+    elif "single_temp" in psd_models:
+        aoe_model = "single_temp"
 
-    # path in the output struct -> description. The levels of a path are cuts
-    # applied in the order mul1, lar, psd; not_<cut> selects events failing
-    # <cut>. Events without a valid A/E pass neither <aoe> nor not_<aoe>.
+    # independent event categories (name -> description), one set per cut
+    lar_categories = {}
+    if has_spms_coinc:
+        lar_categories = {
+            "is_spms_coincident": "light seen by the SiPMs (fails the LAr veto)",
+            "not_spms_coincident": "no light seen by the SiPMs (passes the LAr veto)",
+        }
+    aoe_categories = {}
+    if aoe_model == "pulse_lib":
+        aoe_categories["is_high_aoe"] = "A/E above the high-side cut"
+    if aoe_model is not None:
+        aoe_categories |= {
+            "is_ss_aoe": "single-site A/E (passes the A/E cuts)",
+            "is_low_aoe": "A/E below the low-side cut (multi-site)",
+            "is_invalid_aoe": "no valid or simulated A/E",
+        }
+
+    # path in the output struct -> description. Each path is one combination
+    # of the categories, in the order mul1, LAr, A/E; the paths do not overlap.
     descriptions: dict[str, str] = {}
     if has_geds:
-        descriptions["hit"] = "all HPGe energy deposits in ON channels"
-        descriptions["mul1"] = "multiplicity-1 events: exactly one ON detector fired"
-        for c, (*_, desc) in psd_cuts.items():
-            descriptions[f"mul1/{c}"] = f"multiplicity 1 + passing the {desc}"
-            descriptions[f"mul1/not_{c}"] = (
-                f"multiplicity 1 + valid A/E, failing the {desc}"
-            )
-
-    # the LAr-veto histograms are HPGe-energy spectra: without hit-tier data
-    # (i.e. skip_hit productions) there is nothing to fill them with.
-    if has_geds and has_spms_coinc:
-        descriptions["mul1/lar"] = "multiplicity 1 + LAr anti-coincidence"
-        descriptions["mul1/not_lar"] = "multiplicity 1 + failing the LAr veto"
-        for c, (*_, desc) in psd_cuts.items():
-            descriptions[f"mul1/lar/{c}"] = (
-                f"multiplicity 1 + LAr anti-coincidence + passing the {desc}"
+        category_desc = lar_categories | aoe_categories
+        levels = [c for c in (lar_categories, aoe_categories) if c]
+        for combo in itertools.product(*levels):
+            descriptions["/".join(("mul1", *combo))] = "multiplicity 1" + "".join(
+                f", {category_desc[c]}" for c in combo
             )
 
     # 1-D histograms are split per detector group; mul2 stays global.
@@ -198,14 +174,6 @@ def main() -> None:
         mul2_hist = hist.new.Reg(6000, 0, 6000).Reg(6000, 0, 6000).Double()
 
     log.info("... beginning iteration over cvt file")
-
-    def _fill_per_group(
-        per_group_hists: dict[str, hist.Hist],
-        energy: ak.Array,
-        det_mask: dict[str, ak.Array],
-    ) -> None:
-        for g in groups:
-            per_group_hists[g].fill(ak.flatten(energy[det_mask[g]]))
 
     for chunk in iterator:
         data = chunk.view_as("ak")
@@ -221,68 +189,34 @@ def main() -> None:
 
             good_channel_mask = ak.all(data.geds.quality.is_good_channel, axis=-1)
 
-            data_hit = data[good_channel_mask]
-            det_hit = {g: m[good_channel_mask] for g, m in det_in_group.items()}
-            _fill_per_group(histograms["hit"], data_hit.geds.energy, det_hit)
-
             m1_event_mask = (data.geds.multiplicity == 1) & good_channel_mask
             data_m1 = data[m1_event_mask]
             det_m1 = {g: m[m1_event_mask] for g, m in det_in_group.items()}
-            _fill_per_group(histograms["mul1"], data_m1.geds.energy, det_m1)
 
+            # event masks of the categories
+            in_category = {}
             if has_spms_coinc:
-                lar_pass_m1 = ~data_m1.coincident.spms
-                data_m1_lar = data_m1[lar_pass_m1]
-                det_m1_lar = {g: m[lar_pass_m1] for g, m in det_m1.items()}
-                _fill_per_group(
-                    histograms["mul1/lar"], data_m1_lar.geds.energy, det_m1_lar
-                )
-
-                lar_fail_m1 = data_m1.coincident.spms
-                data_m1_lar_fail = data_m1[lar_fail_m1]
-                det_m1_lar_fail = {g: m[lar_fail_m1] for g, m in det_m1.items()}
-                _fill_per_group(
-                    histograms["mul1/not_lar"],
-                    data_m1_lar_fail.geds.energy,
-                    det_m1_lar_fail,
-                )
-
-            # events without a valid or simulated A/E are classified as
-            # background (cut), and are not counted as failing the cut.
-            for cut, (model, flag, pass_if_false, _) in psd_cuts.items():
+                in_category["is_spms_coincident"] = data_m1.coincident.spms
+                in_category["not_spms_coincident"] = ~data_m1.coincident.spms
+            if aoe_model is not None:
                 psd = data_m1.geds.psd
-                has_aoe = ak.all(psd.is_good & psd[model].has_aoe, axis=-1)
-                passed = psd[model][flag]
-                if pass_if_false:
-                    passed = ~passed
-                psd_pass_m1 = has_aoe & ak.all(passed, axis=-1)
+                valid = ak.all(psd.is_good & psd[aoe_model].has_aoe, axis=-1)
+                single_site = ak.all(psd[aoe_model].is_single_site, axis=-1)
+                high = ak.zeros_like(valid)
+                if aoe_model == "pulse_lib":
+                    high = valid & ak.all(psd.pulse_lib.is_high_aoe, axis=-1)
+                    in_category["is_high_aoe"] = high
+                in_category["is_ss_aoe"] = valid & ~high & single_site
+                in_category["is_low_aoe"] = valid & ~high & ~single_site
+                in_category["is_invalid_aoe"] = ~valid
 
-                data_m1_psd = data_m1[psd_pass_m1]
-                det_m1_psd = {g: m[psd_pass_m1] for g, m in det_m1.items()}
-                _fill_per_group(
-                    histograms[f"mul1/{cut}"], data_m1_psd.geds.energy, det_m1_psd
-                )
-
-                if has_spms_coinc:
-                    psd_pass_m1_lar = psd_pass_m1[lar_pass_m1]
-                    data_m1_lar_psd = data_m1_lar[psd_pass_m1_lar]
-                    det_m1_lar_psd = {
-                        g: m[psd_pass_m1_lar] for g, m in det_m1_lar.items()
-                    }
-                    _fill_per_group(
-                        histograms[f"mul1/lar/{cut}"],
-                        data_m1_lar_psd.geds.energy,
-                        det_m1_lar_psd,
-                    )
-
-                psd_fail_mask = has_aoe & ~psd_pass_m1
-                data_m1_psd_fail = data_m1[psd_fail_mask]
-                det_m1_psd_fail = {g: m[psd_fail_mask] for g, m in det_m1.items()}
-                _fill_per_group(
-                    histograms[f"mul1/not_{cut}"],
-                    data_m1_psd_fail.geds.energy,
-                    det_m1_psd_fail,
-                )
+            for path, per_group_hists in histograms.items():
+                sel = np.ones(len(data_m1), dtype=bool)
+                for c in path.split("/")[1:]:
+                    sel = sel & in_category[c]
+                energy = data_m1.geds.energy[sel]
+                for g, h in per_group_hists.items():
+                    h.fill(ak.flatten(energy[det_m1[g][sel]]))
 
             data_m2 = data[(data.geds.multiplicity == 2) & good_channel_mask]
             assert mul2_hist is not None
