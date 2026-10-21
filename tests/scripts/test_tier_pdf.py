@@ -43,16 +43,18 @@ def _exists(pdf_file: Path, path: str) -> bool:
         return path in f
 
 
-def _make_metadata_with_pdf_settings(tmp_path: Path, extra_pdf_settings: dict) -> Path:
-    """Copy dummyprod inputs to tmp_path and patch the pdf/legend/settings.yaml."""
+def _make_metadata(tmp_path: Path, **tier_settings: dict) -> Path:
+    """Copy dummyprod inputs to tmp_path and patch tier/<tier>/legend/settings.yaml."""
     meta_dir = tmp_path / "inputs"
     shutil.copytree(dummyprod / "inputs", meta_dir)
-    settings_path = (
-        meta_dir / "simprod" / "config" / "tier" / "pdf" / "legend" / "settings.yaml"
-    )
-    base = yaml.safe_load(settings_path.read_text())
-    base.update(extra_pdf_settings)
-    settings_path.write_text(yaml.safe_dump(base))
+    for tier, extra in tier_settings.items():
+        path = (
+            meta_dir / "simprod" / "config" / "tier" / tier / "legend" / "settings.yaml"
+        )
+        base = yaml.safe_load(path.read_text()) if path.exists() else {}
+        base.update(extra)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(yaml.safe_dump(base))
     return meta_dir
 
 
@@ -216,7 +218,10 @@ def test_pdf_pulse_lib_cuts(tmp_path, monkeypatch):
     cvt_file = tmp_path / "cvt.lh5"
     lh5.write(evt, "evt", cvt_file, wo_mode="write_safe")
     _write_cvt_root(cvt_file, ["V01"], [1])
-    pdf_file = _run_pdf(tmp_path, monkeypatch, cvt_file)
+    meta_dir = _make_metadata(
+        tmp_path, hit={"simulate_psd": False, "simulate_psd_with_psl": True}
+    )
+    pdf_file = _run_pdf(tmp_path, monkeypatch, cvt_file, meta_dir=meta_dir)
 
     def _sum(path):
         return lh5.read_as(path, pdf_file, "hist").sum()
@@ -236,7 +241,8 @@ def test_pdf_pulse_lib_cuts(tmp_path, monkeypatch):
 def test_pdf_no_psd(tmp_path, monkeypatch):
     cvt_file = tmp_path / "cvt.lh5"
     _make_cvt_file(cvt_file, with_psd=False)
-    pdf_file = _run_pdf(tmp_path, monkeypatch, cvt_file)
+    meta_dir = _make_metadata(tmp_path, hit={"simulate_psd": False})
+    pdf_file = _run_pdf(tmp_path, monkeypatch, cvt_file, meta_dir=meta_dir)
 
     def _sum(path):
         return lh5.read_as(path, pdf_file, "hist").sum()
@@ -291,7 +297,12 @@ def _make_cvt_file_surface(path: Path) -> None:
 def test_pdf_energy_threshold(tmp_path, monkeypatch):
     cvt_file = tmp_path / "cvt.lh5"
     _make_cvt_file_surface(cvt_file)
-    pdf_file = _run_pdf(tmp_path, monkeypatch, cvt_file)
+    meta_dir = _make_metadata(
+        tmp_path,
+        evt={"skip_opt": True},
+        hit={"simulate_psd": False, "store_surface_steps": True},
+    )
+    pdf_file = _run_pdf(tmp_path, monkeypatch, cvt_file, meta_dir=meta_dir)
 
     def _hist(path):
         return lh5.read_as(path, pdf_file, "hist")
@@ -308,8 +319,11 @@ def test_pdf_energy_threshold(tmp_path, monkeypatch):
 
 
 def test_pdf_fccd_tag(tmp_path, monkeypatch):
-    meta_dir = _make_metadata_with_pdf_settings(
-        tmp_path, {"fccd_tag_energy_thr_kev": 10}
+    meta_dir = _make_metadata(
+        tmp_path,
+        evt={"skip_opt": True},
+        hit={"simulate_psd": False, "store_surface_steps": True},
+        pdf={"fccd_tag_energy_thr_kev": 10},
     )
     cvt_file = tmp_path / "cvt.lh5"
     _make_cvt_file_surface(cvt_file)
@@ -323,9 +337,7 @@ def test_pdf_fccd_tag(tmp_path, monkeypatch):
 
 
 def test_pdf_fccd_tag_needs_surface_steps(tmp_path, monkeypatch):
-    meta_dir = _make_metadata_with_pdf_settings(
-        tmp_path, {"fccd_tag_energy_thr_kev": 10}
-    )
+    meta_dir = _make_metadata(tmp_path, pdf={"fccd_tag_energy_thr_kev": 10})
     cvt_file = tmp_path / "cvt.lh5"
     _make_cvt_file(cvt_file)
 
@@ -397,7 +409,8 @@ def test_pdf_script_cli_skip_opt(tmp_path, monkeypatch):
     """With no spms coincidence data (skip_opt), LAr histograms must be absent."""
     cvt_file = tmp_path / "cvt.lh5"
     _make_cvt_file_no_spms(cvt_file)
-    pdf_file = _run_pdf(tmp_path, monkeypatch, cvt_file)
+    meta_dir = _make_metadata(tmp_path, evt={"skip_opt": True})
+    pdf_file = _run_pdf(tmp_path, monkeypatch, cvt_file, meta_dir=meta_dir)
 
     assert pdf_file.exists()
 
@@ -414,7 +427,12 @@ def test_pdf_script_cli_skip_hit(tmp_path, monkeypatch, caplog):
     cvt_file = tmp_path / "cvt.lh5"
     _make_cvt_file_no_geds(cvt_file)
     with caplog.at_level("WARNING"):
-        pdf_file = _run_pdf(tmp_path, monkeypatch, cvt_file)
+        pdf_file = _run_pdf(
+            tmp_path,
+            monkeypatch,
+            cvt_file,
+            meta_dir=_make_metadata(tmp_path, evt={"skip_hit": True}),
+        )
     # spurious "matches no detectors" warning is suppressed when has_geds=False
     assert "matches no detectors" not in caplog.text
 
@@ -463,8 +481,8 @@ _ALL_CUTS = tuple(
 
 def test_pdf_detector_groups_schema(tmp_path, monkeypatch):
     """With detector_groups configured, output has per-group and 'all' histograms for every cut."""
-    meta_dir = _make_metadata_with_pdf_settings(
-        tmp_path, {"detector_groups": {"icpc": "V.*", "bege": "B.*"}}
+    meta_dir = _make_metadata(
+        tmp_path, pdf={"detector_groups": {"icpc": "V.*", "bege": "B.*"}}
     )
 
     cvt_file = tmp_path / "cvt.lh5"
@@ -487,7 +505,7 @@ def test_pdf_detector_groups_schema(tmp_path, monkeypatch):
 
 def test_pdf_no_detector_groups_schema(tmp_path, monkeypatch):
     """Without detector_groups, output has only 'all' histograms for every cut."""
-    meta_dir = _make_metadata_with_pdf_settings(tmp_path, {})
+    meta_dir = _make_metadata(tmp_path, pdf={})
 
     cvt_file = tmp_path / "cvt.lh5"
     _make_cvt_file(cvt_file)
@@ -505,8 +523,8 @@ def test_pdf_no_detector_groups_schema(tmp_path, monkeypatch):
 
 def test_pdf_detector_groups_sum_equals_all(tmp_path, monkeypatch):
     """For non-overlapping groups that partition all detectors, sum of groups equals 'all'."""
-    meta_dir = _make_metadata_with_pdf_settings(
-        tmp_path, {"detector_groups": {"icpc": "V.*", "bege": "B.*"}}
+    meta_dir = _make_metadata(
+        tmp_path, pdf={"detector_groups": {"icpc": "V.*", "bege": "B.*"}}
     )
 
     cvt_file = tmp_path / "cvt.lh5"
@@ -530,8 +548,8 @@ def test_pdf_detector_groups_sum_equals_all(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize(("all_regex", "warns"), [(".*", False), ("V.*", True)])
 def test_pdf_explicit_all_group(tmp_path, monkeypatch, caplog, all_regex, warns):
-    meta_dir = _make_metadata_with_pdf_settings(
-        tmp_path, {"detector_groups": {"all": all_regex, "icpc": "V.*"}}
+    meta_dir = _make_metadata(
+        tmp_path, pdf={"detector_groups": {"all": all_regex, "icpc": "V.*"}}
     )
     cvt_file = tmp_path / "cvt.lh5"
     _make_cvt_file(cvt_file)

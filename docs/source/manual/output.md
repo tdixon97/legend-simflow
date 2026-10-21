@@ -448,9 +448,10 @@ detector, as deposited, before the dead-layer model. The FCCD is read from the
 detector metadata. It is limited to `surface_depth_in_mm`, the depth of the
 stored depositions, with a warning.
 
-A level is omitted when its data is missing: the LAr level without SiPM data,
-the A/E level when no PSD is simulated. For example, without SiPM data the paths
-are `pdf/mul1/<aoe_category>/<group>`.
+A level is omitted when the tier settings say its data was not produced: the LAr
+level with `skip_opt` in the `evt` tier, the A/E level when the `hit` tier runs
+with neither `simulate_psd` nor `simulate_psd_with_psl`. For example, with
+`skip_opt` the paths are `pdf/mul1/<aoe_category>/<group>`.
 
 :::{tip}
 
