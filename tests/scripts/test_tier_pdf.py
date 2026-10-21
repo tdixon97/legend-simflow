@@ -89,7 +89,7 @@ def _run_pdf(
     return pdf_file
 
 
-def _make_cvt_file(path: Path) -> None:
+def _make_cvt_file(path: Path, with_psd: bool = True) -> None:
     """Write a minimal cvt LH5 file with the fields expected by the pdf script."""
     # 6 events:
     # - event 0: m1, 500 keV,      spms=False, PSD valid+simulated+single-site → not_spms_coincident/is_ss_aoe
@@ -135,9 +135,10 @@ def _make_cvt_file(path: Path) -> None:
             "rawid": rawid,
             "quality": Table(col_dict={"is_good_channel": is_good_channel}),
             "multiplicity": multiplicity,
-            "psd": psd,
         }
     )
+    if with_psd:
+        geds.add_field("psd", psd)
     coincident = Table(col_dict={"spms": spms})
     evt = Table(col_dict={"geds": geds, "coincident": coincident})
     lh5.write(evt, "evt", path, wo_mode="write_safe")
@@ -230,6 +231,21 @@ def test_pdf_pulse_lib_cuts(tmp_path, monkeypatch):
     for aoe, (n_no_light, n_light) in expected.items():
         assert _sum(f"pdf/mul1/not_spms_coincident/{aoe}/all") == n_no_light, aoe
         assert _sum(f"pdf/mul1/is_spms_coincident/{aoe}/all") == n_light, aoe
+
+
+def test_pdf_no_psd(tmp_path, monkeypatch):
+    cvt_file = tmp_path / "cvt.lh5"
+    _make_cvt_file(cvt_file, with_psd=False)
+    pdf_file = _run_pdf(tmp_path, monkeypatch, cvt_file)
+
+    def _sum(path):
+        return lh5.read_as(path, pdf_file, "hist").sum()
+
+    # without PSD the A/E level is left out: events 0, 1, 2, 5 pass the LAr
+    # veto, event 3 does not
+    assert _sum("pdf/mul1/not_spms_coincident/all") == 4
+    assert _sum("pdf/mul1/is_spms_coincident/all") == 1
+    assert not _exists(pdf_file, "pdf/mul1/not_spms_coincident/is_ss_aoe")
 
 
 def _make_cvt_file_surface(path: Path) -> None:
