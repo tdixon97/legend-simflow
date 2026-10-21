@@ -29,7 +29,7 @@ from lgdo import Histogram, Scalar, Struct
 from snakemake_argparse_bridge import snakemake_compatible
 
 from legendsimflow import nersc, utils
-from legendsimflow.metadata import get_tier_settings
+from legendsimflow.metadata import get_sanitized_fccd, get_tier_settings
 from legendsimflow.scripts import log_script_invocation
 
 
@@ -161,12 +161,45 @@ def main() -> None:
             "is_invalid_aoe": "no valid or simulated A/E",
         }
 
+    # optional tag of the events with energy deposited in the FCCD layer
+    fccd_thr = tier_pdf_settings.fccd_tag_energy_thr_kev
+    fccd_categories = {}
+    if has_geds and fccd_thr is not None:
+        if "surface" not in _geds_fields:
+            msg = (
+                "fccd_tag_energy_thr_kev needs the steps near the n+ surface, "
+                "run the hit tier with store_surface_steps"
+            )
+            raise ValueError(msg)
+        fccd_categories = {
+            "is_fccd_tagged": f"more than {fccd_thr} keV deposited in the FCCD layer",
+            "not_fccd_tagged": f"at most {fccd_thr} keV deposited in the FCCD layer",
+        }
+
+        # FCCD of each detector, ordered by UID for the lookup of the hits
+        surface_depth = get_tier_settings(config, "hit").surface_depth_in_mm
+        fccd_uids = np.array(sorted(name_to_uid.values()), dtype=np.int64)
+        uid_to_name = {uid: n for n, uid in name_to_uid.items()}
+        fccd_of_uid = np.zeros(len(fccd_uids))
+        for i, uid in enumerate(fccd_uids):
+            name = uid_to_name[uid]
+            fccd_of_uid[i] = get_sanitized_fccd(config.metadata, name)
+            if fccd_of_uid[i] > surface_depth:
+                log.warning(
+                    "FCCD of %s (%s mm) exceeds surface_depth_in_mm, using %s mm",
+                    name,
+                    fccd_of_uid[i],
+                    surface_depth,
+                )
+                fccd_of_uid[i] = surface_depth
+
     # path in the output struct -> description. Each path is one combination
-    # of the categories, in the order mul1, LAr, A/E; the paths do not overlap.
+    # of the categories, in the order mul1, LAr, A/E, FCCD; the paths do not
+    # overlap.
     descriptions: dict[str, str] = {}
     if has_geds:
-        category_desc = lar_categories | aoe_categories
-        levels = [c for c in (lar_categories, aoe_categories) if c]
+        category_desc = lar_categories | aoe_categories | fccd_categories
+        levels = [c for c in (lar_categories, aoe_categories, fccd_categories) if c]
         for combo in itertools.product(*levels):
             descriptions["/".join(("mul1", *combo))] = "multiplicity 1" + "".join(
                 f", {category_desc[c]}" for c in combo
@@ -226,6 +259,16 @@ def main() -> None:
                 in_category["is_ss_aoe"] = valid & ~high & single_site
                 in_category["is_low_aoe"] = valid & ~high & ~single_site
                 in_category["is_invalid_aoe"] = ~valid
+            if fccd_categories:
+                surface = data_m1.geds.surface
+                fccd = ak.unflatten(
+                    fccd_of_uid[np.searchsorted(fccd_uids, flat_uid)], counts
+                )[m1_event_mask]
+                distance = surface.distance_to_nplus[above_m1]
+                edep_fccd = ak.sum(surface.edep[above_m1][distance < fccd], axis=-1)
+                tagged = ak.any(edep_fccd > fccd_thr, axis=-1)
+                in_category["is_fccd_tagged"] = tagged
+                in_category["not_fccd_tagged"] = ~tagged
 
             for path, per_group_hists in histograms.items():
                 sel = np.ones(len(data_m1), dtype=bool)

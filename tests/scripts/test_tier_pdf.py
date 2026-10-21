@@ -234,10 +234,11 @@ def test_pdf_pulse_lib_cuts(tmp_path, monkeypatch):
 
 def _make_cvt_file_surface(path: Path) -> None:
     """Write a cvt file with surface steps and hits below the 25 keV threshold."""
-    # a "-" hit is below threshold and in an AC detector, it must be ignored
-    # - event 0: m1, 1000 keV
-    # - event 1: m1, 1000 keV
-    # - event 2: m1, 800 keV + 10 keV(-)
+    # detector V99000A has a FCCD of 0.75 mm; a "-" hit is below threshold and
+    # in an AC detector, it must be ignored
+    # - event 0: m1, 1000 keV, 5 keV in the FCCD             -> not_fccd_tagged
+    # - event 1: m1, 1000 keV, 15 keV in the FCCD            -> is_fccd_tagged
+    # - event 2: m1, 800 keV + 10 keV(-) with 50 keV in FCCD -> not_fccd_tagged
     # - event 3: m2, 300 + 400 keV + 5 keV(-)
     geds = Table(
         col_dict={
@@ -288,6 +289,32 @@ def test_pdf_energy_threshold(tmp_path, monkeypatch):
     mul2 = _hist("pdf/mul2")
     assert mul2.sum() == 1
     assert mul2[300j, 400j] == 1
+
+
+def test_pdf_fccd_tag(tmp_path, monkeypatch):
+    meta_dir = _make_metadata_with_pdf_settings(
+        tmp_path, {"fccd_tag_energy_thr_kev": 10}
+    )
+    cvt_file = tmp_path / "cvt.lh5"
+    _make_cvt_file_surface(cvt_file)
+    pdf_file = _run_pdf(tmp_path, monkeypatch, cvt_file, meta_dir=meta_dir)
+
+    def _sum(path):
+        return lh5.read_as(path, pdf_file, "hist").sum()
+
+    assert _sum("pdf/mul1/is_fccd_tagged/all") == 1
+    assert _sum("pdf/mul1/not_fccd_tagged/all") == 2
+
+
+def test_pdf_fccd_tag_needs_surface_steps(tmp_path, monkeypatch):
+    meta_dir = _make_metadata_with_pdf_settings(
+        tmp_path, {"fccd_tag_energy_thr_kev": 10}
+    )
+    cvt_file = tmp_path / "cvt.lh5"
+    _make_cvt_file(cvt_file)
+
+    with pytest.raises(ValueError, match="store_surface_steps"):
+        _run_pdf(tmp_path, monkeypatch, cvt_file, meta_dir=meta_dir)
 
 
 def _make_cvt_file_no_spms(path: Path) -> None:

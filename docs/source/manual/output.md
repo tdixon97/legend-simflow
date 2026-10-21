@@ -379,15 +379,16 @@ attribute in the LH5 attrs.
 The 1D histograms are stored at paths of the form
 
 ```text
-pdf/mul1/<lar_category>/<aoe_category>/<group>
+pdf/mul1/<lar_category>/<aoe_category>[/<fccd_category>]/<group>
 ```
 
 Only multiplicity-1 events are histogrammed in 1D: exactly one detector fired
 (`geds.multiplicity == 1`), and it is ON (not AC or OFF, i.e.
 `geds.quality.is_good_channel` is `True`). Hits below the `evt` tier energy
 threshold `geds_energy_thr_kev` are ignored. The category levels below `mul1`
-split these events by the LAr veto and by A/E. Every event falls in exactly one
-category of each level, so the histograms do not overlap.
+split these events by the LAr veto, by A/E and, optionally, by the energy
+deposited in the FCCD layer. Every event falls in exactly one category of each
+level, so the histograms do not overlap.
 
 The last path element is the detector group. Each group is a `Histogram` of the
 energies (in keV, 1 keV bins from 0 to 6000 keV) of the hits in the detectors of
@@ -425,18 +426,27 @@ pdf/
 | A/E   | `is_ss_aoe`           | single-site: A/E above the low-side cut (`is_single_site`) and not above the high-side cut    |
 | A/E   | `is_low_aoe`          | multi-site: A/E below the low-side cut and not above the high-side cut                        |
 | A/E   | `is_invalid_aoe`      | no A/E available: `psd.is_good` or `has_aoe` is `False`                                       |
+| FCCD  | `is_fccd_tagged`      | more than `fccd_tag_energy_thr_kev` deposited in the FCCD layer                               |
+| FCCD  | `not_fccd_tagged`     | at most `fccd_tag_energy_thr_kev` deposited in the FCCD layer                                 |
 
 The A/E flags are taken from the pulse-shape library model (`psd.pulse_lib`)
 when the `hit` tier runs with `simulate_psd_with_psl`, and otherwise from the
 single-template model (`psd.single_temp`) when it runs with `simulate_psd` (see
 {ref}`hit-tier-settings`). The single-template model has no high-side cut, so
 `is_high_aoe` is absent. This gives 8 categories with the pulse-shape library
-and 6 with the single template.
+and 6 with the single template, twice as many with the FCCD level.
 
 `is_invalid_aoe` holds events with a detector that is ON with valid PSD in data,
 but whose PSD response could not be simulated (e.g. because it is not included
 in the simulation model), or that has no valid PSD in data. An analysis applying
 an A/E cut treats these events as background.
+
+The FCCD level is present only when `fccd_tag_energy_thr_kev` is set (see
+{ref}`pdf-tier-settings`). The energy in the FCCD layer is the sum of the
+depositions in `geds/surface/edep` closer to the n+ surface than the FCCD of the
+detector, as deposited, before the dead-layer model. The FCCD is read from the
+detector metadata. It is limited to `surface_depth_in_mm`, the depth of the
+stored depositions, with a warning.
 
 A level is omitted when its data is missing: the LAr level without SiPM data,
 the A/E level when no PSD is simulated. For example, without SiPM data the paths

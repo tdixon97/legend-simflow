@@ -682,6 +682,9 @@ buffer_len: "500*MB"
 detector_groups:
   icpc: "V.*"
   bege: "B.*"
+
+# optional: split the events by the energy deposited in the FCCD layer
+fccd_tag_energy_thr_kev: 10
 ```
 
 - `buffer_len` (str) — LH5 read chunk size (e.g. `"500*MB"`). Controls memory
@@ -695,6 +698,13 @@ detector_groups:
   emitted regardless of the config. An explicit `all` entry must be `".*"`; any
   other value is replaced by `".*"` with a warning. See {ref}`pdf-tier` for the
   resulting output schema.
+- `fccd_tag_energy_thr_kev` (float, default `null`) — when set, the
+  multiplicity-1 events are also split by the energy deposited in the FCCD layer
+  of the detector (the depositions closer to the n+ surface than its FCCD).
+  Events with more than this energy, in keV, are tagged. The fit can then scale
+  them by a separate factor, for example for the rejection of n+ surface events.
+  Requires `store_surface_steps` in the `hit` tier (see
+  {ref}`hit-tier-settings`).
 
 ## `pars/` — simulation parameters
 
