@@ -418,6 +418,9 @@ pdf/
 
 #### Categories
 
+The categories are computed by the functions in {mod}`legendsimflow.pdf`, which
+other scripts can use too.
+
 | Level | Category              | Selection                                                                                     |
 | ----- | --------------------- | --------------------------------------------------------------------------------------------- |
 | LAr   | `is_spms_coincident`  | light seen by the SiPMs (`coincident.spms` is `True`), i.e. the event fails the LAr veto      |
@@ -475,7 +478,7 @@ implementation.
 
 ### Spectra on a grid of parameters
 
-{func}`legendsimflow.pdf_grid.build_pdf_grid` evaluates a PDF, a function of the
+{func}`legendsimflow.pdf.build_pdf_grid` evaluates a PDF, a function of the
 parameter values that returns a histogram, on an evenly spaced grid of
 parameters. [Refit.jl](https://github.com/legend-exp/Refit.jl) reads the result
 as a generalised histogram and interpolates between the grid points. The

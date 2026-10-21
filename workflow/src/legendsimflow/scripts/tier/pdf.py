@@ -31,13 +31,15 @@ from lgdo import Histogram, Scalar, Struct
 from snakemake_argparse_bridge import snakemake_compatible
 
 from legendsimflow import nersc, utils
-from legendsimflow.metadata import get_sanitized_fccd, get_tier_settings
+from legendsimflow.metadata import get_tier_settings
+from legendsimflow.pdf import (
+    aoe_categories,
+    fccd_by_uid,
+    fccd_categories,
+    format_pdf_struct,
+    lar_categories,
+)
 from legendsimflow.scripts import log_script_invocation
-
-
-def _one_hit(field: ak.Array, is_hit: ak.Array) -> ak.Array:
-    """Return the field of the one selected hit of each event."""
-    return field[is_hit][:, 0]
 
 
 def _detector_group_uids(
@@ -102,153 +104,6 @@ def _category_levels(
             }
         )
     return levels
-
-
-def _fccd_by_uid(
-    metadata: Mapping,
-    name_to_uid: Mapping[str, int],
-    surface_depth: float,
-    log: logging.Logger,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Return the sorted detector UIDs and their FCCD in mm, limited to `surface_depth`."""
-    names = sorted(name_to_uid, key=name_to_uid.get)
-    uids = np.array([name_to_uid[n] for n in names], dtype=np.int64)
-    fccd_mm = np.zeros(len(names))
-    for i, name in enumerate(names):
-        fccd_mm[i] = get_sanitized_fccd(metadata, name)
-        # the steps deeper than surface_depth are not stored
-        if fccd_mm[i] > surface_depth:
-            log.warning(
-                "FCCD of %s (%s mm) exceeds surface_depth_in_mm, using %s mm",
-                name,
-                fccd_mm[i],
-                surface_depth,
-            )
-            fccd_mm[i] = surface_depth
-    return uids, fccd_mm
-
-
-def _lar_categories(evt: ak.Array) -> dict[str, np.ndarray]:
-    """Return the event masks of the LAr veto categories.
-
-    The categories are defined by ``coincident.spms``, the LAr veto flag of
-    the `evt` tier, which is `True` when the SiPMs see enough light:
-
-    - ``is_spms_coincident``: light seen, the event fails the LAr veto;
-    - ``not_spms_coincident``: no light seen, the event passes the LAr veto.
-
-    Parameters
-    ----------
-    evt
-        events of the `evt` tier.
-    """
-    spms = ak.to_numpy(evt.coincident.spms)
-    return {"is_spms_coincident": spms, "not_spms_coincident": ~spms}
-
-
-def _aoe_categories(
-    evt: ak.Array, is_hit: ak.Array, aoe_model: str
-) -> dict[str, np.ndarray]:
-    """Return the event masks of the A/E categories, from the A/E of one hit.
-
-    The flags come from ``geds.psd`` and its ``<aoe_model>`` subtable. The A/E
-    classifier is the corrected A/E in units of its resolution, compared in
-    the `hit` tier with the low- and high-side A/E cuts of the detector. In
-    order of precedence:
-
-    - ``is_invalid_aoe``: no A/E available, i.e. ``psd.is_good`` (valid PSD in
-      data) or ``has_aoe`` (A/E simulated) is `False`;
-    - ``is_high_aoe``: classifier above the high-side cut (``is_high_aoe``).
-      Only with the pulse-shape library, the single template has no
-      high-side cut;
-    - ``is_ss_aoe``: single-site, classifier above the low-side cut
-      (``is_single_site``);
-    - ``is_low_aoe``: multi-site, classifier below the low-side cut.
-
-    Each event is in exactly one category.
-
-    Parameters
-    ----------
-    evt
-        events of the `evt` tier, with one hit selected by `is_hit` in each.
-    is_hit
-        selection of the hit of each event.
-    aoe_model
-        ``pulse_lib`` (pulse-shape library) or ``single_temp`` (single
-        template).
-    """
-    psd = evt.geds.psd
-    aoe = psd[aoe_model]
-    valid = ak.to_numpy(_one_hit(psd.is_good, is_hit) & _one_hit(aoe.has_aoe, is_hit))
-    single_site = ak.to_numpy(_one_hit(aoe.is_single_site, is_hit))
-
-    categories = {}
-    high = np.zeros(len(valid), dtype=bool)
-    if aoe_model == "pulse_lib":
-        high = valid & ak.to_numpy(_one_hit(aoe.is_high_aoe, is_hit))
-        categories["is_high_aoe"] = high
-    categories["is_ss_aoe"] = valid & ~high & single_site
-    categories["is_low_aoe"] = valid & ~high & ~single_site
-    categories["is_invalid_aoe"] = ~valid
-    return categories
-
-
-def _fccd_categories(
-    evt: ak.Array, is_hit: ak.Array, fccd_mm: np.ndarray, energy_thr_kev: float
-) -> dict[str, np.ndarray]:
-    """Return the event masks of the FCCD categories, from the steps of one hit.
-
-    The energy in the FCCD layer is the sum of the energy depositions
-    ``geds.surface.edep`` (keV) with a distance to the n+ surface
-    ``geds.surface.distance_to_nplus`` (mm) smaller than the FCCD of the
-    detector. These are the energies as deposited, before the dead-layer
-    model:
-
-    - ``is_fccd_tagged``: more than `energy_thr_kev` in the FCCD layer;
-    - ``not_fccd_tagged``: at most `energy_thr_kev` in the FCCD layer.
-
-    Parameters
-    ----------
-    evt
-        events of the `evt` tier, with one hit selected by `is_hit` in each.
-    is_hit
-        selection of the hit of each event.
-    fccd_mm
-        FCCD in mm of the detector of the hit, for each event.
-    energy_thr_kev
-        energy threshold in keV.
-    """
-    surface = evt.geds.surface
-    in_fccd = _one_hit(surface.distance_to_nplus, is_hit) < fccd_mm
-    edep_fccd = ak.sum(_one_hit(surface.edep, is_hit)[in_fccd], axis=-1)
-    tagged = ak.to_numpy(edep_fccd > energy_thr_kev)
-    return {"is_fccd_tagged": tagged, "not_fccd_tagged": ~tagged}
-
-
-def _to_struct(node: Mapping) -> Struct:
-    """Convert nested dicts to nested LGDO structs."""
-    return Struct(
-        {k: _to_struct(v) if isinstance(v, Mapping) else v for k, v in node.items()}
-    )
-
-
-def _output_struct(
-    histograms: Mapping[str, Mapping[str, hist.Hist]],
-    descriptions: Mapping[str, str],
-) -> Struct:
-    """Nest the histograms by the levels of their path, with the groups as leaves."""
-    tree: dict = {}
-    for path, per_group in histograms.items():
-        node = tree
-        for level in path.split("/"):
-            node = node.setdefault(level, {})
-        node.update(
-            {
-                g: Histogram(h, attrs={"description": descriptions[path]})
-                for g, h in per_group.items()
-            }
-        )
-    return _to_struct(tree)
 
 
 @snakemake_compatible(
@@ -316,11 +171,10 @@ def main() -> None:
             tier_pdf_settings.detector_groups, name_to_uid, log
         )
         if fccd_thr is not None:
-            sorted_uids, fccd_mm = _fccd_by_uid(
+            sorted_uids, fccd_mm = fccd_by_uid(
                 config.metadata,
                 name_to_uid,
                 tier_hit_settings.surface_depth_in_mm,
-                log,
             )
 
         # path in the output struct -> description. Each path is one
@@ -365,18 +219,18 @@ def main() -> None:
             is_m1 = (multiplicity == 1) & is_good
             evt_m1 = data[is_m1]
             hit_m1 = above_thr[is_m1]
-            energy = ak.to_numpy(_one_hit(evt_m1.geds.energy, hit_m1))
-            uid = ak.to_numpy(_one_hit(evt_m1.geds.rawid, hit_m1))
+            energy = ak.to_numpy(evt_m1.geds.energy[hit_m1][:, 0])
+            uid = ak.to_numpy(evt_m1.geds.rawid[hit_m1][:, 0])
 
             # event masks of the categories of all levels
             in_category = {}
             if has_spms_coinc:
-                in_category |= _lar_categories(evt_m1)
+                in_category |= lar_categories(evt_m1)
             if aoe_model is not None:
-                in_category |= _aoe_categories(evt_m1, hit_m1, aoe_model)
+                in_category |= aoe_categories(evt_m1, hit_m1, aoe_model)
             if fccd_thr is not None:
                 fccd_of_hit = fccd_mm[np.searchsorted(sorted_uids, uid)]
-                in_category |= _fccd_categories(evt_m1, hit_m1, fccd_of_hit, fccd_thr)
+                in_category |= fccd_categories(evt_m1, hit_m1, fccd_of_hit, fccd_thr)
 
             in_group = {g: np.isin(uid, uids) for g, uids in group_uids.items()}
             for path, per_group_hists in histograms.items():
@@ -387,7 +241,7 @@ def main() -> None:
                     h.fill(energy[sel & in_group[g]])
 
         log.info("... convert histograms to lgdo")
-        output = _output_struct(histograms, descriptions)
+        output = format_pdf_struct(histograms, descriptions)
         output.add_field(
             "mul2",
             Histogram(

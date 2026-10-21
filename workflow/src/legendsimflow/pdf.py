@@ -1,0 +1,326 @@
+# Copyright (C) 2025 Luigi Pertoldi <gipert@pm.me>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option) any
+# later version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""Probability density functions (PDFs) of the pdf tier.
+
+- event categories: LAr veto, A/E and energy in the FCCD layer. The functions
+  take events of the `evt` (or `cvt`) tier as :class:`awkward.Array` and
+  return one event mask per category. Each event is in exactly one category
+  of each level.
+- the output struct of the pdf tier.
+- spectra on a grid of parameters, in the layout Refit.jl reads as a
+  generalised histogram.
+"""
+
+from __future__ import annotations
+
+import itertools
+import logging
+from collections.abc import Callable, Mapping
+
+import awkward as ak
+import hist
+import numpy as np
+from lgdo import Histogram, Scalar, Struct
+
+from .metadata import get_sanitized_fccd
+
+log = logging.getLogger(__name__)
+
+
+def build_pdf_grid(
+    pdf: Callable[
+        [dict[str, float]], hist.Hist | Histogram | Mapping[str, hist.Hist | Histogram]
+    ],
+    axes: Mapping[str, tuple[float, float, float]],
+) -> Struct | dict[str, Struct]:
+    """Evaluate a PDF at every point of an evenly spaced grid of parameters.
+
+    The result is an LGDO struct that Refit.jl reads as a generalised histogram:
+    a ``grid_info`` struct with the name and the ``first``, ``last`` and ``step`` values of each
+    parameter (``axis_0``, ``axis_1``, ...), and a ``grid`` struct with the
+    histogram of each grid point at ``grid/<name0>_<i>/<name1>_<j>/...``,
+    nested in the order of `axes`, with indices counted from 0. Write it with
+    ``lh5.write``.
+
+    Parameters
+    ----------
+    pdf
+        function of the parameter values, given as a dictionary ``{name:
+        value}``, that returns the histogram at this grid point, or a dictionary
+        of histograms ``{key: histogram}`` to build several PDFs in one scan.
+        The histograms of a PDF must have the same binning at all grid points
+        and hold raw counts, from the same number of simulated primaries.
+    axes
+        for each parameter, in the order of the grid axes, its ``(first, last,
+        step)`` values.
+
+    Returns
+    -------
+    the grid, or a dictionary ``{key: grid}`` if `pdf` returns a dictionary.
+
+    Examples
+    --------
+    >>> grid = build_pdf_grid(pdf, {"fccd_sigma": (-5, 5, 1), "dlf": (0, 1, 0.25)})
+    >>> lh5.write(grid, "pdf_grid/mul1/all", "grid.lh5")
+    """
+    grid_info = Struct()
+    values = {}
+    for d, (name, (first, last, step)) in enumerate(axes.items()):
+        values[name] = first + step * np.arange(round((last - first) / step) + 1)
+        grid_info.add_field(f"axis_{d}/name", Scalar(name))
+        for key, value in (("first", first), ("last", last), ("step", step)):
+            grid_info.add_field(f"axis_{d}/values/{key}", Scalar(float(value)))
+
+    grids = {}
+    for idx in itertools.product(*(range(len(v)) for v in values.values())):
+        hists = pdf(
+            {name: float(values[name][i]) for name, i in zip(values, idx, strict=True)}
+        )
+        if not isinstance(hists, Mapping):
+            hists = {None: hists}
+
+        point = "/".join(f"{name}_{i}" for name, i in zip(values, idx, strict=True))
+        for key, h in hists.items():
+            if key not in grids:
+                grids[key] = Struct({"grid_info": grid_info, "grid": Struct()})
+            grids[key]["grid"].add_field(
+                point, h if isinstance(h, Histogram) else Histogram(h)
+            )
+
+    for grid in grids.values():
+        validate_grid(grid)
+
+    # one grid if pdf returns one histogram
+    return grids.get(None, grids)
+
+
+def validate_grid(grid: Struct) -> None:
+    """Check a grid as returned by :func:`build_pdf_grid`.
+
+    Raises a :class:`ValueError` if an axis does not go from ``first`` to
+    ``last`` in whole steps, if a grid point has no histogram, or if the
+    histograms have different binnings.
+
+    Parameters
+    ----------
+    grid
+        the grid, built or read from a file with ``lh5.read``.
+    """
+    n_values = {}
+    for axis in grid["grid_info"].values():
+        name = axis["name"].value
+        name = name.decode() if isinstance(name, bytes) else name  # bytes when read
+        first, last, step = (axis["values"][k].value for k in ("first", "last", "step"))
+        n_values[name] = round((last - first) / step) + 1
+        if n_values[name] < 2 or not np.isclose(
+            first + (n_values[name] - 1) * step, last
+        ):
+            msg = f"axis {name} does not go from {first} to {last} in steps of {step}"
+            raise ValueError(msg)
+
+    edges = None
+    for idx in itertools.product(*(range(n) for n in n_values.values())):
+        point = "/".join(f"{name}_{i}" for name, i in zip(n_values, idx, strict=True))
+        if point not in grid["grid"]:
+            msg = f"grid point {point} has no histogram"
+            raise ValueError(msg)
+
+        point_edges = [ax.edges for ax in grid["grid"][point].binning]
+        if edges is None:
+            edges = point_edges
+        elif len(point_edges) != len(edges) or not all(
+            np.array_equal(a, b) for a, b in zip(point_edges, edges, strict=False)
+        ):
+            msg = f"the histogram at grid point {point} has a different binning"
+            raise ValueError(msg)
+
+
+def _one_hit(field: ak.Array, is_hit: ak.Array) -> ak.Array:
+    """Return the field of the one selected hit of each event."""
+    return field[is_hit][:, 0]
+
+
+def lar_categories(evt: ak.Array) -> dict[str, np.ndarray]:
+    """Return the event masks of the LAr veto categories.
+
+    The categories are defined by ``coincident.spms``, the LAr veto flag of
+    the `evt` tier, which is `True` when the SiPMs see enough light:
+
+    - ``is_spms_coincident``: light seen, the event fails the LAr veto;
+    - ``not_spms_coincident``: no light seen, the event passes the LAr veto.
+
+    Parameters
+    ----------
+    evt
+        events of the `evt` tier.
+    """
+    spms = ak.to_numpy(evt.coincident.spms)
+    return {"is_spms_coincident": spms, "not_spms_coincident": ~spms}
+
+
+def aoe_categories(
+    evt: ak.Array, is_hit: ak.Array, aoe_model: str
+) -> dict[str, np.ndarray]:
+    """Return the event masks of the A/E categories, from the A/E of one hit.
+
+    The flags come from ``geds.psd`` and its ``<aoe_model>`` subtable. The A/E
+    classifier is the corrected A/E in units of its resolution, compared in
+    the `hit` tier with the low- and high-side A/E cuts of the detector. In
+    order of precedence:
+
+    - ``is_invalid_aoe``: no A/E available, i.e. ``psd.is_good`` (valid PSD in
+      data) or ``has_aoe`` (A/E simulated) is `False`;
+    - ``is_high_aoe``: classifier above the high-side cut (``is_high_aoe``).
+      Only with the pulse-shape library, the single template has no
+      high-side cut;
+    - ``is_ss_aoe``: single-site, classifier above the low-side cut
+      (``is_single_site``);
+    - ``is_low_aoe``: multi-site, classifier below the low-side cut.
+
+    Each event is in exactly one category.
+
+    Parameters
+    ----------
+    evt
+        events of the `evt` tier, with one hit selected by `is_hit` in each.
+    is_hit
+        selection of the hit of each event.
+    aoe_model
+        ``pulse_lib`` (pulse-shape library) or ``single_temp`` (single
+        template).
+    """
+    psd = evt.geds.psd
+    aoe = psd[aoe_model]
+    valid = ak.to_numpy(_one_hit(psd.is_good, is_hit) & _one_hit(aoe.has_aoe, is_hit))
+    single_site = ak.to_numpy(_one_hit(aoe.is_single_site, is_hit))
+
+    categories = {}
+    high = np.zeros(len(valid), dtype=bool)
+    if aoe_model == "pulse_lib":
+        high = valid & ak.to_numpy(_one_hit(aoe.is_high_aoe, is_hit))
+        categories["is_high_aoe"] = high
+    categories["is_ss_aoe"] = valid & ~high & single_site
+    categories["is_low_aoe"] = valid & ~high & ~single_site
+    categories["is_invalid_aoe"] = ~valid
+    return categories
+
+
+def fccd_categories(
+    evt: ak.Array, is_hit: ak.Array, fccd_mm: np.ndarray, energy_thr_kev: float
+) -> dict[str, np.ndarray]:
+    """Return the event masks of the FCCD categories, from the steps of one hit.
+
+    The energy in the FCCD layer is the sum of the energy depositions
+    ``geds.surface.edep`` (keV) with a distance to the n+ surface
+    ``geds.surface.distance_to_nplus`` (mm) smaller than the FCCD of the
+    detector. These are the energies as deposited, before the dead-layer
+    model:
+
+    - ``is_fccd_tagged``: more than `energy_thr_kev` in the FCCD layer;
+    - ``not_fccd_tagged``: at most `energy_thr_kev` in the FCCD layer.
+
+    Parameters
+    ----------
+    evt
+        events of the `evt` tier, with one hit selected by `is_hit` in each.
+    is_hit
+        selection of the hit of each event.
+    fccd_mm
+        FCCD in mm of the detector of the hit, for each event.
+    energy_thr_kev
+        energy threshold in keV.
+    """
+    surface = evt.geds.surface
+    in_fccd = _one_hit(surface.distance_to_nplus, is_hit) < fccd_mm
+    edep_fccd = ak.sum(_one_hit(surface.edep, is_hit)[in_fccd], axis=-1)
+    tagged = ak.to_numpy(edep_fccd > energy_thr_kev)
+    return {"is_fccd_tagged": tagged, "not_fccd_tagged": ~tagged}
+
+
+def fccd_by_uid(
+    metadata: Mapping,
+    name_to_uid: Mapping[str, int],
+    surface_depth: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Return the sorted detector UIDs and their FCCD in mm.
+
+    The FCCD is read from the detector metadata with
+    :func:`.metadata.get_sanitized_fccd`. It is limited to `surface_depth`,
+    the depth of the steps stored in ``geds.surface``, with a warning. The
+    FCCD of the detector of each hit is then
+    ``fccd_mm[np.searchsorted(uids, uid)]``.
+
+    Parameters
+    ----------
+    metadata
+        LEGEND metadata database.
+    name_to_uid
+        map of the detector names to their UIDs, e.g. ``detector_uids`` of
+        the `cvt` tier.
+    surface_depth
+        ``surface_depth_in_mm`` of the `hit` tier settings.
+    """
+    names = sorted(name_to_uid, key=name_to_uid.get)
+    uids = np.array([name_to_uid[n] for n in names], dtype=np.int64)
+    fccd_mm = np.zeros(len(names))
+    for i, name in enumerate(names):
+        fccd_mm[i] = get_sanitized_fccd(metadata, name)
+        # the steps deeper than surface_depth are not stored
+        if fccd_mm[i] > surface_depth:
+            log.warning(
+                "FCCD of %s (%s mm) exceeds surface_depth_in_mm, using %s mm",
+                name,
+                fccd_mm[i],
+                surface_depth,
+            )
+            fccd_mm[i] = surface_depth
+    return uids, fccd_mm
+
+
+def _to_struct(node: dict) -> Struct:
+    """Convert nested dicts to nested LGDO structs."""
+    # not Mapping: an LGDO Histogram is a Mapping and must stay as is
+    return Struct(
+        {k: _to_struct(v) if isinstance(v, dict) else v for k, v in node.items()}
+    )
+
+
+def format_pdf_struct(
+    histograms: Mapping[str, Mapping[str, hist.Hist]],
+    descriptions: Mapping[str, str],
+) -> Struct:
+    """Nest the histograms of the pdf tier by the levels of their path.
+
+    Parameters
+    ----------
+    histograms
+        histograms by path (e.g. ``mul1/not_spms_coincident/is_ss_aoe``) and
+        detector group. The groups are the leaves of the output.
+    descriptions
+        description of each path, stored in the ``description`` attribute of
+        its histograms.
+    """
+    tree: dict = {}
+    for path, per_group in histograms.items():
+        node = tree
+        for level in path.split("/"):
+            node = node.setdefault(level, {})
+        node.update(
+            {
+                g: Histogram(h, attrs={"description": descriptions[path]})
+                for g, h in per_group.items()
+            }
+        )
+    return _to_struct(tree)
