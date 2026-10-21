@@ -33,6 +33,11 @@ from legendsimflow.metadata import get_sanitized_fccd, get_tier_settings
 from legendsimflow.scripts import log_script_invocation
 
 
+def _one_hit(field: ak.Array, is_hit: ak.Array) -> ak.Array:
+    """Return the field of the one selected hit of each event."""
+    return field[is_hit][:, 0]
+
+
 @snakemake_compatible(
     mapping={
         "cvt_file": "input.cvt_file",
@@ -102,12 +107,12 @@ def main() -> None:
             log.warning("detector group %r matches no detectors", gname)
         group_uids[gname] = np.asarray(matched, dtype=np.int64)
 
-    # a single cvt file might be large, need to iterate
-    iterator = lh5.LH5Iterator(
-        str(cvt_file),
-        "evt",
-        buffer_len=buffer_len,
-    )
+    # a single cvt file might be large, need to iterate. Without HPGe data
+    # there is nothing to fill.
+    iterator = []
+    if has_geds:
+        iterator = lh5.LH5Iterator(str(cvt_file), "evt", buffer_len=buffer_len)
+        geds_energy_thr_kev = get_tier_settings(config, "evt").geds_energy_thr_kev
 
     # the number of simulated primary events is written by remage at the root
     # of each stp file, forwarded through the evt tier and summed over all jobs
@@ -120,166 +125,149 @@ def main() -> None:
         "... read number of simulated events from cvt file %s", number_of_primaries
     )
 
-    # 1 keV/bin over 0-6000 keV; boost-histogram only provides Double (float64) storage
-    h1 = hist.new.Reg(6000, 0, 6000).Double
+    # independent event categories (name -> description), one dict per level.
+    # A level is left out when its data is missing.
+    levels: list[dict[str, str]] = []
 
-    _geds_fields = set()
-    if has_geds:
-        _geds_fields = {
-            k.removeprefix("evt/geds/") for k in lh5.ls(_cvt_file_str, "evt/geds/")
-        }
-        geds_energy_thr_kev = get_tier_settings(config, "evt").geds_energy_thr_kev
+    if has_spms_coinc:
+        levels.append(
+            {
+                "is_spms_coincident": "light seen by the SiPMs (fails the LAr veto)",
+                "not_spms_coincident": "no light seen by the SiPMs (passes the LAr veto)",
+            }
+        )
 
-    psd_models = set()
-    if "psd" in _geds_fields:
-        psd_models = {
-            k.removeprefix("evt/geds/psd/")
-            for k in lh5.ls(_cvt_file_str, "evt/geds/psd/")
-        }
     # the A/E categories come from the pulse-shape library when it was
     # simulated, otherwise from the single template (which has no high-side cut)
+    geds_fields = set(lh5.ls(_cvt_file_str, "evt/geds/")) if has_geds else set()
+    psd_models = set()
+    if "evt/geds/psd" in geds_fields:
+        psd_models = set(lh5.ls(_cvt_file_str, "evt/geds/psd/"))
     aoe_model = None
-    if "pulse_lib" in psd_models:
+    if "evt/geds/psd/pulse_lib" in psd_models:
         aoe_model = "pulse_lib"
-    elif "single_temp" in psd_models:
+    elif "evt/geds/psd/single_temp" in psd_models:
         aoe_model = "single_temp"
-
-    # independent event categories (name -> description), one set per cut
-    lar_categories = {}
-    if has_spms_coinc:
-        lar_categories = {
-            "is_spms_coincident": "light seen by the SiPMs (fails the LAr veto)",
-            "not_spms_coincident": "no light seen by the SiPMs (passes the LAr veto)",
-        }
-    aoe_categories = {}
-    if aoe_model == "pulse_lib":
-        aoe_categories["is_high_aoe"] = "A/E above the high-side cut"
     if aoe_model is not None:
-        aoe_categories |= {
-            "is_ss_aoe": "single-site A/E (passes the A/E cuts)",
-            "is_low_aoe": "A/E below the low-side cut (multi-site)",
-            "is_invalid_aoe": "no valid or simulated A/E",
-        }
+        aoe_level = {}
+        if aoe_model == "pulse_lib":
+            aoe_level["is_high_aoe"] = "A/E above the high-side cut"
+        aoe_level["is_ss_aoe"] = "single-site A/E (passes the A/E cuts)"
+        aoe_level["is_low_aoe"] = "A/E below the low-side cut (multi-site)"
+        aoe_level["is_invalid_aoe"] = "no valid or simulated A/E"
+        levels.append(aoe_level)
 
-    # optional tag of the events with energy deposited in the FCCD layer
     fccd_thr = tier_pdf_settings.fccd_tag_energy_thr_kev
-    fccd_categories = {}
     if has_geds and fccd_thr is not None:
-        if "surface" not in _geds_fields:
+        if "evt/geds/surface" not in geds_fields:
             msg = (
                 "fccd_tag_energy_thr_kev needs the steps near the n+ surface, "
                 "run the hit tier with store_surface_steps"
             )
             raise ValueError(msg)
-        fccd_categories = {
-            "is_fccd_tagged": f"more than {fccd_thr} keV deposited in the FCCD layer",
-            "not_fccd_tagged": f"at most {fccd_thr} keV deposited in the FCCD layer",
-        }
+        levels.append(
+            {
+                "is_fccd_tagged": f"more than {fccd_thr} keV deposited in the FCCD layer",
+                "not_fccd_tagged": f"at most {fccd_thr} keV deposited in the FCCD layer",
+            }
+        )
 
-        # FCCD of each detector, ordered by UID for the lookup of the hits
+        # FCCD of each detector in mm, in the order of the sorted UIDs
         surface_depth = get_tier_settings(config, "hit").surface_depth_in_mm
-        fccd_uids = np.array(sorted(name_to_uid.values()), dtype=np.int64)
-        uid_to_name = {uid: n for n, uid in name_to_uid.items()}
-        fccd_of_uid = np.zeros(len(fccd_uids))
-        for i, uid in enumerate(fccd_uids):
-            name = uid_to_name[uid]
-            fccd_of_uid[i] = get_sanitized_fccd(config.metadata, name)
-            if fccd_of_uid[i] > surface_depth:
+        names = sorted(name_to_uid, key=name_to_uid.get)
+        sorted_uids = np.array([name_to_uid[n] for n in names], dtype=np.int64)
+        fccd_mm = np.zeros(len(names))
+        for i, name in enumerate(names):
+            fccd_mm[i] = get_sanitized_fccd(config.metadata, name)
+            if fccd_mm[i] > surface_depth:
                 log.warning(
                     "FCCD of %s (%s mm) exceeds surface_depth_in_mm, using %s mm",
                     name,
-                    fccd_of_uid[i],
+                    fccd_mm[i],
                     surface_depth,
                 )
-                fccd_of_uid[i] = surface_depth
+                fccd_mm[i] = surface_depth
 
     # path in the output struct -> description. Each path is one combination
-    # of the categories, in the order mul1, LAr, A/E, FCCD; the paths do not
-    # overlap.
+    # of categories, one per level; the paths do not overlap.
     descriptions: dict[str, str] = {}
     if has_geds:
-        category_desc = lar_categories | aoe_categories | fccd_categories
-        levels = [c for c in (lar_categories, aoe_categories, fccd_categories) if c]
+        category_desc = {k: v for level in levels for k, v in level.items()}
         for combo in itertools.product(*levels):
             descriptions["/".join(("mul1", *combo))] = "multiplicity 1" + "".join(
                 f", {category_desc[c]}" for c in combo
             )
 
-    # 1-D histograms are split per detector group; mul2 stays global.
-    histograms = {path: {g: h1() for g in groups} for path in descriptions}
-
-    mul2_hist = None
-    if has_geds:
-        # 2-D: (E_min, E_max) for multiplicity-2 events; not split by group
-        mul2_hist = hist.new.Reg(6000, 0, 6000).Reg(6000, 0, 6000).Double()
+    # 1 keV/bin over 0-6000 keV, split per detector group; boost-histogram
+    # only provides Double (float64) storage
+    histograms = {
+        path: {g: hist.new.Reg(6000, 0, 6000).Double() for g in groups}
+        for path in descriptions
+    }
+    # 2-D: (E_min, E_max) for multiplicity-2 events; not split by group
+    mul2_hist = hist.new.Reg(6000, 0, 6000).Reg(6000, 0, 6000).Double()
 
     log.info("... beginning iteration over cvt file")
 
     for chunk in iterator:
         data = chunk.view_as("ak")
+        geds = data.geds
 
-        if has_geds:
-            # with store_surface_steps the evt tier keeps the hits below the
-            # energy threshold: drop them from every per-hit field used here
-            above_thr = data.geds.energy > geds_energy_thr_kev
-            energy = data.geds.energy[above_thr]
+        # with store_surface_steps the evt tier also keeps the hits below the
+        # energy threshold: drop them. The multiplicity is counted here, not
+        # read from geds.multiplicity, so that it matches the float32 energies.
+        above_thr = geds.energy > geds_energy_thr_kev
+        multiplicity = ak.sum(above_thr, axis=-1)
+        is_good = ak.all(geds.quality.is_good_channel[above_thr], axis=-1)
 
-            # awkward 2.x has no ak.isin: build per-group masks via flatten / np.isin / unflatten.
-            counts = ak.num(energy)
-            flat_uid = ak.flatten(data.geds.rawid[above_thr])
-            det_in_group = {
-                g: ak.unflatten(np.isin(flat_uid, uids), counts)
-                for g, uids in group_uids.items()
-            }
+        energy_m2 = geds.energy[above_thr][(multiplicity == 2) & is_good]
+        mul2_hist.fill(ak.min(energy_m2, axis=-1), ak.max(energy_m2, axis=-1))
 
-            good_channel_mask = ak.all(
-                data.geds.quality.is_good_channel[above_thr], axis=-1
+        # multiplicity-1 events have exactly one hit above threshold: keep it,
+        # so that every per-hit field has one entry per event
+        is_m1 = (multiplicity == 1) & is_good
+        evt_m1 = data[is_m1]
+        hit_m1 = above_thr[is_m1]
+
+        energy = ak.to_numpy(_one_hit(evt_m1.geds.energy, hit_m1))
+        uid = ak.to_numpy(_one_hit(evt_m1.geds.rawid, hit_m1))
+
+        in_category = {}
+        if has_spms_coinc:
+            spms = ak.to_numpy(evt_m1.coincident.spms)
+            in_category["is_spms_coincident"] = spms
+            in_category["not_spms_coincident"] = ~spms
+        if aoe_model is not None:
+            psd = evt_m1.geds.psd
+            aoe = psd[aoe_model]
+            valid = ak.to_numpy(
+                _one_hit(psd.is_good, hit_m1) & _one_hit(aoe.has_aoe, hit_m1)
             )
+            single_site = ak.to_numpy(_one_hit(aoe.is_single_site, hit_m1))
+            high = np.zeros(len(valid), dtype=bool)
+            if aoe_model == "pulse_lib":
+                high = valid & ak.to_numpy(_one_hit(aoe.is_high_aoe, hit_m1))
+                in_category["is_high_aoe"] = high
+            in_category["is_ss_aoe"] = valid & ~high & single_site
+            in_category["is_low_aoe"] = valid & ~high & ~single_site
+            in_category["is_invalid_aoe"] = ~valid
+        if fccd_thr is not None:
+            # energy of the steps closer to the n+ surface than the FCCD
+            surface = evt_m1.geds.surface
+            fccd = fccd_mm[np.searchsorted(sorted_uids, uid)]
+            in_fccd = _one_hit(surface.distance_to_nplus, hit_m1) < fccd
+            edep_fccd = ak.sum(_one_hit(surface.edep, hit_m1)[in_fccd], axis=-1)
+            tagged = ak.to_numpy(edep_fccd > fccd_thr)
+            in_category["is_fccd_tagged"] = tagged
+            in_category["not_fccd_tagged"] = ~tagged
 
-            m1_event_mask = (data.geds.multiplicity == 1) & good_channel_mask
-            data_m1 = data[m1_event_mask]
-            above_m1 = above_thr[m1_event_mask]
-            energy_m1 = energy[m1_event_mask]
-            det_m1 = {g: m[m1_event_mask] for g, m in det_in_group.items()}
-
-            # event masks of the categories
-            in_category = {}
-            if has_spms_coinc:
-                in_category["is_spms_coincident"] = data_m1.coincident.spms
-                in_category["not_spms_coincident"] = ~data_m1.coincident.spms
-            if aoe_model is not None:
-                psd = data_m1.geds.psd
-                aoe = psd[aoe_model]
-                valid = ak.all(psd.is_good[above_m1] & aoe.has_aoe[above_m1], axis=-1)
-                single_site = ak.all(aoe.is_single_site[above_m1], axis=-1)
-                high = ak.zeros_like(valid)
-                if aoe_model == "pulse_lib":
-                    high = valid & ak.all(aoe.is_high_aoe[above_m1], axis=-1)
-                    in_category["is_high_aoe"] = high
-                in_category["is_ss_aoe"] = valid & ~high & single_site
-                in_category["is_low_aoe"] = valid & ~high & ~single_site
-                in_category["is_invalid_aoe"] = ~valid
-            if fccd_categories:
-                surface = data_m1.geds.surface
-                fccd = ak.unflatten(
-                    fccd_of_uid[np.searchsorted(fccd_uids, flat_uid)], counts
-                )[m1_event_mask]
-                distance = surface.distance_to_nplus[above_m1]
-                edep_fccd = ak.sum(surface.edep[above_m1][distance < fccd], axis=-1)
-                tagged = ak.any(edep_fccd > fccd_thr, axis=-1)
-                in_category["is_fccd_tagged"] = tagged
-                in_category["not_fccd_tagged"] = ~tagged
-
-            for path, per_group_hists in histograms.items():
-                sel = np.ones(len(data_m1), dtype=bool)
-                for c in path.split("/")[1:]:
-                    sel = sel & in_category[c]
-                for g, h in per_group_hists.items():
-                    h.fill(ak.flatten(energy_m1[sel][det_m1[g][sel]]))
-
-            energy_m2 = energy[(data.geds.multiplicity == 2) & good_channel_mask]
-            assert mul2_hist is not None
-            mul2_hist.fill(ak.min(energy_m2, axis=-1), ak.max(energy_m2, axis=-1))
+        in_group = {g: np.isin(uid, uids) for g, uids in group_uids.items()}
+        for path, per_group_hists in histograms.items():
+            sel = np.ones(len(energy), dtype=bool)
+            for c in path.split("/")[1:]:
+                sel &= in_category[c]
+            for g, h in per_group_hists.items():
+                h.fill(energy[sel & in_group[g]])
 
     log.info("... convert histograms to lgdo")
 
@@ -294,7 +282,7 @@ def main() -> None:
                 for g, h in per_group.items()
             }
         )
-    if mul2_hist is not None:
+    if has_geds:
         tree["mul2"] = Histogram(
             mul2_hist,
             attrs={
