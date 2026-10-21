@@ -25,11 +25,11 @@ max-jobs-per-second: 20
 max-status-checks-per-second: 20
 
 # set resource limits to a single Slurm job. at NERSC, the total wall time must
-# be less than 12h and a node offers max 512GB memory. this includes grouped
-# jobs
+# be less than 12h and Slurm grants 487802 MiB of memory per CPU node (leave
+# some room for the system). this includes grouped jobs
 resources:
   runtime: 720 # minutes
-  mem_mb: 524288
+  mem_mb: 480000
 
 # apply caps per SLURM submission, not as a global workflow budget
 set-resource-scopes:
@@ -42,7 +42,8 @@ set-resource-scopes:
 default-resources:
   nodes: 1
   runtime: 1 # minutes
-  mem_mb: 2000
+  # 512 GB for 256 hardware threads: 2 GB per thread
+  mem_mb: 2000 * threads
   slurm_account: m2676
   constraint: cpu
   slurm_extra: --licenses scratch,cfs --mail-type end,fail --mail-user luigi.pertoldi@tum.de
@@ -109,6 +110,8 @@ set-resources:
 
   build_tier_opt:
     runtime: 10
+    # measured up to 2.5 GB
+    mem_mb: 2500
 
   plot_geom_rendering:
     mem_mb: 2500

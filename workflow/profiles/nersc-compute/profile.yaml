@@ -9,10 +9,18 @@ scheduler: greedy
 local-storage-prefix: $SCRATCH/legend-simflow/$HOSTNAME
 
 # https://docs.nersc.gov/systems/perlmutter/architecture/
+# Slurm grants 487802 MiB per CPU node, leave some room for the system
 resources:
-  mem_mb: 512000
+  mem_mb: 480000
+
+# 512 GB for 256 hardware threads: 2 GB per thread
+default-resources:
+  mem_mb: 2000 * threads
 
 set-resources:
+  # measured up to 2.5 GB
+  build_tier_opt:
+    mem_mb: 2500
   # this SSD.jl processes seems to use a lot of memory, can't run so many in
   # parallel!
   build_hpge_drift_time_map:
