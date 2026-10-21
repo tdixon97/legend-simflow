@@ -138,7 +138,8 @@ def main() -> None:
         )
 
     # the A/E categories come from the pulse-shape library when it was
-    # simulated, otherwise from the single template (which has no high-side cut)
+    # simulated, otherwise from the single template (which has no high-side
+    # cut). Without simulated PSD there is no geds/psd and no A/E level.
     geds_fields = set(lh5.ls(_cvt_file_str, "evt/geds/")) if has_geds else set()
     psd_models = set()
     if "evt/geds/psd" in geds_fields:
