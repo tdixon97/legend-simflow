@@ -91,12 +91,12 @@ def _run_pdf(
 def _make_cvt_file(path: Path) -> None:
     """Write a minimal cvt LH5 file with the fields expected by the pdf script."""
     # 6 events:
-    # - event 0: m1, 500 keV,      spms=False, PSD valid+simulated+single-site → passes all cuts
-    # - event 1: m1, 1000 keV,     spms=False, PSD valid+simulated+multi-site  → mul1/not_aoe_st
-    # - event 2: m1, 1500 keV,     spms=False, PSD not valid                   → cut (no observable)
-    # - event 3: m1, 2000 keV,     spms=True,  PSD valid+simulated+single-site → mul1/not_lar
+    # - event 0: m1, 500 keV,      spms=False, PSD valid+simulated+single-site → not_spms_coincident/is_ss_aoe
+    # - event 1: m1, 1000 keV,     spms=False, PSD valid+simulated+multi-site  → not_spms_coincident/is_low_aoe
+    # - event 2: m1, 1500 keV,     spms=False, PSD not valid                   → not_spms_coincident/is_invalid_aoe
+    # - event 3: m1, 2000 keV,     spms=True,  PSD valid+simulated+single-site → is_spms_coincident/is_ss_aoe
     # - event 4: m2, 200+300 keV,  spms=False
-    # - event 5: m1, 2500 keV,     spms=False, PSD valid+not simulated         → cut (no observable)
+    # - event 5: m1, 2500 keV,     spms=False, PSD valid+not simulated         → not_spms_coincident/is_invalid_aoe
     multiplicity = Array(np.array([1, 1, 1, 1, 2, 1], dtype=np.int32))
     energy = VectorOfVectors(
         data=[[500.0], [1000.0], [1500.0], [2000.0], [200.0, 300.0], [2500.0]]
@@ -157,53 +157,36 @@ def test_pdf_script_cli(tmp_path, monkeypatch):
     # the pdf script must read number_of_events back from the cvt file
     assert nr_sim_events.value == _N_SIM_EVENTS
 
-    for name in (
-        "pdf/hit",
-        "pdf/mul1",
-        "pdf/mul1/lar",
-        "pdf/mul1/not_lar",
-        "pdf/mul1/aoe_st",
-        "pdf/mul1/not_aoe_st",
-        "pdf/mul1/lar/aoe_st",
-        "pdf/mul2",
-    ):
-        assert _exists(pdf_file, name), name
-
     def _sum(path):
         return lh5.read_as(path, pdf_file, "hist").sum()
 
-    # 7 per-detector deposits: 5 m1 + 2 m2
-    assert _sum("pdf/hit/all") == 7
+    expected = {
+        "not_spms_coincident/is_ss_aoe": 1,
+        "not_spms_coincident/is_low_aoe": 1,
+        "not_spms_coincident/is_invalid_aoe": 2,
+        "is_spms_coincident/is_ss_aoe": 1,
+        "is_spms_coincident/is_low_aoe": 0,
+        "is_spms_coincident/is_invalid_aoe": 0,
+    }
+    for path, n in expected.items():
+        assert _sum(f"pdf/mul1/{path}/all") == n, path
 
-    # 5 m1 events
-    assert _sum("pdf/mul1/all") == 5
-
-    # event 3 (spms=True) is vetoed: 4 survive
-    assert _sum("pdf/mul1/lar/all") == 4
-
-    # events 0 and 3 pass PSD (valid+simulated+SS); events 1 (MS), 2 (invalid), 5 (not simulated) cut
-    assert _sum("pdf/mul1/aoe_st/all") == 2
-
-    # event 3 also fails LAr, so only event 0 survives both
-    assert _sum("pdf/mul1/lar/aoe_st/all") == 1
+    # single template: no high-side cut
+    assert not _exists(pdf_file, "pdf/mul1/not_spms_coincident/is_high_aoe")
+    assert not _exists(pdf_file, "pdf/mul1/all")
+    assert not _exists(pdf_file, "pdf/hit")
 
     # 1 m2 event
     assert _sum("pdf/mul2") == 1
 
-    # event 3 fails LAr
-    assert _sum("pdf/mul1/not_lar/all") == 1
-
-    # event 1 (valid+simulated PSD, multi-site) fails PSD; event 5 (not simulated) excluded
-    assert _sum("pdf/mul1/not_aoe_st/all") == 1
-
 
 def test_pdf_pulse_lib_cuts(tmp_path, monkeypatch):
     # all events m1; columns: has_aoe, is_single_site, is_high_aoe, is_bb_like
-    # - event 0: 500 keV,  T, T, F, T, spms=False -> passes all cuts
-    # - event 1: 1000 keV, T, F, F, F, spms=False -> fails low side
-    # - event 2: 1500 keV, T, T, T, F, spms=False -> fails high side
-    # - event 3: 2000 keV, F, F, F, F, spms=False -> no A/E, excluded
-    # - event 4: 2500 keV, T, T, F, T, spms=True  -> passes all, LAr vetoed
+    # - event 0: 500 keV,  T, T, F, T, spms=False -> is_ss_aoe
+    # - event 1: 1000 keV, T, F, F, F, spms=False -> is_low_aoe
+    # - event 2: 1500 keV, T, T, T, F, spms=False -> is_high_aoe
+    # - event 3: 2000 keV, F, F, F, F, spms=False -> is_invalid_aoe
+    # - event 4: 2500 keV, T, T, F, T, spms=True  -> is_ss_aoe
     def _vov(values):
         return VectorOfVectors(data=[[v] for v in values])
 
@@ -233,22 +216,19 @@ def test_pdf_pulse_lib_cuts(tmp_path, monkeypatch):
     _write_cvt_root(cvt_file, ["V01"], [1])
     pdf_file = _run_pdf(tmp_path, monkeypatch, cvt_file)
 
-    # no single_temp model in the input: no single-template histograms
-    assert not _exists(pdf_file, "pdf/mul1/aoe_st")
-    assert not _exists(pdf_file, "pdf/mul1/not_aoe_st")
-
     def _sum(path):
         return lh5.read_as(path, pdf_file, "hist").sum()
 
+    # (not_spms_coincident, is_spms_coincident)
     expected = {
-        "aoe_psl_low": (3, 2, 1),
-        "aoe_psl_high": (3, 2, 1),
-        "aoe_psl": (2, 1, 2),
+        "is_high_aoe": (1, 0),
+        "is_ss_aoe": (1, 1),
+        "is_low_aoe": (1, 0),
+        "is_invalid_aoe": (1, 0),
     }
-    for cut, (n_pass, n_pass_lar, n_fail) in expected.items():
-        assert _sum(f"pdf/mul1/{cut}/all") == n_pass
-        assert _sum(f"pdf/mul1/lar/{cut}/all") == n_pass_lar
-        assert _sum(f"pdf/mul1/not_{cut}/all") == n_fail
+    for aoe, (n_no_light, n_light) in expected.items():
+        assert _sum(f"pdf/mul1/not_spms_coincident/{aoe}/all") == n_no_light, aoe
+        assert _sum(f"pdf/mul1/is_spms_coincident/{aoe}/all") == n_light, aoe
 
 
 def _make_cvt_file_no_spms(path: Path) -> None:
@@ -319,18 +299,11 @@ def test_pdf_script_cli_skip_opt(tmp_path, monkeypatch):
 
     assert pdf_file.exists()
 
-    # geds-based histograms must all be present
-    for name in (
-        "pdf/hit",
-        "pdf/mul1",
-        "pdf/mul1/aoe_st",
-        "pdf/mul1/not_aoe_st",
-        "pdf/mul2",
-    ):
-        assert _exists(pdf_file, name), name
-
-    # LAr histograms must be absent: no spms coincidence data was present
-    for name in ("pdf/mul1/lar", "pdf/mul1/not_lar"):
+    # the LAr level is omitted: no spms coincidence data was present
+    for aoe in ("is_ss_aoe", "is_low_aoe", "is_invalid_aoe"):
+        assert _exists(pdf_file, f"pdf/mul1/{aoe}/all"), aoe
+    assert _exists(pdf_file, "pdf/mul2")
+    for name in ("pdf/mul1/is_spms_coincident", "pdf/mul1/not_spms_coincident"):
         assert not _exists(pdf_file, name), name
 
 
@@ -346,7 +319,7 @@ def test_pdf_script_cli_skip_hit(tmp_path, monkeypatch, caplog):
     assert pdf_file.exists()
 
     # no histogram is filled without HPGe data, including the LAr-veto ones
-    for name in ("pdf/hit", "pdf/mul1", "pdf/mul2"):
+    for name in ("pdf/mul1", "pdf/mul2"):
         assert not _exists(pdf_file, name), name
 
 
@@ -372,35 +345,17 @@ def test_pdf_script_cli_with_real_cvt(tmp_path, monkeypatch, legend_cvt_path):
     assert nr_sim_events.value > 0
 
     for name in (
-        "pdf/hit",
-        "pdf/mul1",
-        "pdf/mul1/lar",
-        "pdf/mul1/aoe_st",
-        "pdf/mul1/lar/aoe_st",
+        "pdf/mul1/is_spms_coincident/is_ss_aoe/all",
+        "pdf/mul1/not_spms_coincident/is_ss_aoe/all",
         "pdf/mul2",
     ):
         assert _exists(pdf_file, name), name
 
-    def _sum(path):
-        return lh5.read_as(path, pdf_file, "hist").sum()
 
-    # cut hierarchy must be non-increasing
-    n_mul = _sum("pdf/mul1/all")
-    assert _sum("pdf/hit/all") >= n_mul
-    assert _sum("pdf/mul1/lar/all") <= n_mul
-    assert _sum("pdf/mul1/aoe_st/all") <= n_mul
-    assert _sum("pdf/mul1/lar/aoe_st/all") <= _sum("pdf/mul1/lar/all")
-    assert _sum("pdf/mul1/lar/aoe_st/all") <= _sum("pdf/mul1/aoe_st/all")
-
-
-_ALL_CUTS = (
-    "hit",
-    "mul1",
-    "mul1/lar",
-    "mul1/not_lar",
-    "mul1/aoe_st",
-    "mul1/not_aoe_st",
-    "mul1/lar/aoe_st",
+_ALL_CUTS = tuple(
+    f"mul1/{lar}/{aoe}"
+    for lar in ("is_spms_coincident", "not_spms_coincident")
+    for aoe in ("is_ss_aoe", "is_low_aoe", "is_invalid_aoe")
 )
 
 
@@ -482,14 +437,3 @@ def test_pdf_explicit_all_group(tmp_path, monkeypatch, caplog, all_regex, warns)
     with caplog.at_level("WARNING"):
         _run_pdf(tmp_path, monkeypatch, cvt_file, meta_dir=meta_dir)
     assert ("overridden by the implicit all-detector group" in caplog.text) == warns
-
-
-def test_pdf_group_name_reserved(tmp_path, monkeypatch):
-    meta_dir = _make_metadata_with_pdf_settings(
-        tmp_path, {"detector_groups": {"not_lar": "V.*"}}
-    )
-    cvt_file = tmp_path / "cvt.lh5"
-    _make_cvt_file(cvt_file)
-
-    with pytest.raises(ValueError, match="reserved"):
-        _run_pdf(tmp_path, monkeypatch, cvt_file, meta_dir=meta_dir)
