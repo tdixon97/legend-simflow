@@ -34,6 +34,7 @@ from legendsimflow import nersc, utils
 from legendsimflow.metadata import get_tier_settings
 from legendsimflow.pdf import (
     aoe_categories,
+    category_levels,
     fccd_by_uid,
     fccd_categories,
     format_pdf_struct,
@@ -64,46 +65,6 @@ def _detector_group_uids(
             log.warning("detector group %r matches no detectors", name)
         group_uids[name] = np.asarray(matched, dtype=np.int64)
     return group_uids
-
-
-def _aoe_model(tier_hit_settings: Mapping) -> str | None:
-    """Return the A/E model of the categories: the pulse-shape library if simulated, else the single template."""
-    if tier_hit_settings.simulate_psd_with_psl:
-        return "pulse_lib"
-    if tier_hit_settings.simulate_psd:
-        return "single_temp"
-    return None
-
-
-def _category_levels(
-    has_spms_coinc: bool, aoe_model: str | None, fccd_thr: float | None
-) -> list[dict[str, str]]:
-    """Return the event categories (name -> description), one dict per level."""
-    levels = []
-    if has_spms_coinc:
-        levels.append(
-            {
-                "is_spms_coincident": "light seen by the SiPMs (fails the LAr veto)",
-                "not_spms_coincident": "no light seen by the SiPMs (passes the LAr veto)",
-            }
-        )
-    if aoe_model is not None:
-        aoe_level = {}
-        # the single template has no high-side cut
-        if aoe_model == "pulse_lib":
-            aoe_level["is_high_aoe"] = "A/E above the high-side cut"
-        aoe_level["is_ss_aoe"] = "single-site A/E (passes the A/E cuts)"
-        aoe_level["is_low_aoe"] = "A/E below the low-side cut (multi-site)"
-        aoe_level["is_invalid_aoe"] = "no valid or simulated A/E"
-        levels.append(aoe_level)
-    if fccd_thr is not None:
-        levels.append(
-            {
-                "is_fccd_tagged": f"more than {fccd_thr} keV deposited in the FCCD layer",
-                "not_fccd_tagged": f"at most {fccd_thr} keV deposited in the FCCD layer",
-            }
-        )
-    return levels
 
 
 @snakemake_compatible(
@@ -155,7 +116,13 @@ def main() -> None:
     # without HPGe data (skip_hit) there is nothing to histogram
     if not tier_evt_settings.skip_hit:
         has_spms_coinc = not tier_evt_settings.skip_opt
-        aoe_model = _aoe_model(tier_hit_settings)
+        # the A/E categories come from the pulse-shape library when it was
+        # simulated, otherwise from the single template
+        aoe_model = None
+        if tier_hit_settings.simulate_psd_with_psl:
+            aoe_model = "pulse_lib"
+        elif tier_hit_settings.simulate_psd:
+            aoe_model = "single_temp"
         fccd_thr = tier_pdf_settings.fccd_tag_energy_thr_kev
         if fccd_thr is not None and not tier_hit_settings.store_surface_steps:
             msg = (
@@ -177,30 +144,41 @@ def main() -> None:
                 tier_hit_settings.surface_depth_in_mm,
             )
 
-        # path in the output struct -> description. Each path is one
-        # combination of categories, one per level; the paths do not overlap.
-        levels = _category_levels(has_spms_coinc, aoe_model, fccd_thr)
+        # one histogram per combination of categories, one per level, and
+        # detector group; the combinations do not overlap
+        levels = category_levels(has_spms_coinc, aoe_model, fccd_thr)
         category_desc = {k: v for level in levels for k, v in level.items()}
-        descriptions = {
-            "/".join(("mul1", *combo)): "multiplicity 1"
-            + "".join(f", {category_desc[c]}" for c in combo)
-            for combo in itertools.product(*levels)
-        }
+        combos = list(itertools.product(*levels))
+        paths = {combo: "/".join(("mul1", *combo)) for combo in combos}
 
-        # 1 keV/bin over 0-6000 keV, split per detector group; boost-histogram
-        # only provides Double (float64) storage
+        # 1 keV/bin over 0-6000 keV; boost-histogram only provides Double
+        # (float64) storage
         histograms = {
-            path: {g: hist.new.Reg(6000, 0, 6000).Double() for g in group_uids}
-            for path in descriptions
+            combo: {g: hist.new.Reg(6000, 0, 6000).Double() for g in group_uids}
+            for combo in combos
         }
         # 2-D: (E_min, E_max) for multiplicity-2 events; not split by group
         mul2_hist = hist.new.Reg(6000, 0, 6000).Reg(6000, 0, 6000).Double()
 
         log.info("... beginning iteration over cvt file")
 
+        # read only the fields used here: the SiPM table and the surface steps
+        # are large
+        fields = ["geds/energy", "geds/rawid", "geds/quality/is_good_channel"]
+        if has_spms_coinc:
+            fields.append("coincident/spms")
+        if aoe_model is not None:
+            fields += ["geds/psd/is_good", f"geds/psd/{aoe_model}"]
+        if fccd_thr is not None:
+            fields += ["geds/surface/edep", "geds/surface/distance_to_nplus"]
+
         # a single cvt file might be large, need to iterate
-        buffer_len = tier_pdf_settings.buffer_len
-        for chunk in lh5.LH5Iterator(cvt_file, "evt", buffer_len=buffer_len):
+        for chunk in lh5.LH5Iterator(
+            cvt_file,
+            "evt",
+            field_mask=fields,
+            buffer_len=tier_pdf_settings.buffer_len,
+        ):
             data = chunk.view_as("ak")
             geds = data.geds
 
@@ -233,15 +211,22 @@ def main() -> None:
                 in_category |= fccd_categories(evt_m1, hit_m1, fccd_of_hit, fccd_thr)
 
             in_group = {g: np.isin(uid, uids) for g, uids in group_uids.items()}
-            for path, per_group_hists in histograms.items():
+            for combo, per_group_hists in histograms.items():
                 sel = np.ones(len(energy), dtype=bool)
-                for c in path.split("/")[1:]:
+                for c in combo:
                     sel &= in_category[c]
                 for g, h in per_group_hists.items():
                     h.fill(energy[sel & in_group[g]])
 
         log.info("... convert histograms to lgdo")
-        output = format_pdf_struct(histograms, descriptions)
+        output = format_pdf_struct(
+            {paths[combo]: h for combo, h in histograms.items()},
+            {
+                paths[combo]: "multiplicity 1"
+                + "".join(f", {category_desc[c]}" for c in combo)
+                for combo in combos
+            },
+        )
         output.add_field(
             "mul2",
             Histogram(
@@ -253,9 +238,7 @@ def main() -> None:
         )
 
     lh5.write(output, "pdf", pdf_file, wo_mode="w")
-    lh5.write(
-        Scalar(int(number_of_primaries)), "nr_sim_events", pdf_file, wo_mode="append"
-    )
+    lh5.write(Scalar(number_of_primaries), "nr_sim_events", pdf_file, wo_mode="append")
 
 
 if __name__ == "__main__":

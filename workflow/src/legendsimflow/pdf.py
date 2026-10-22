@@ -158,6 +158,51 @@ def _one_hit(field: ak.Array, is_hit: ak.Array) -> ak.Array:
     return field[is_hit][:, 0]
 
 
+def category_levels(
+    has_spms_coinc: bool, aoe_model: str | None, fccd_thr: float | None
+) -> list[dict[str, str]]:
+    """Return the event categories (name -> description), one dict per level.
+
+    The names are the keys of the event masks of :func:`lar_categories`,
+    :func:`aoe_categories` and :func:`fccd_categories`. A level is left out when
+    its data is missing.
+
+    Parameters
+    ----------
+    has_spms_coinc
+        whether the LAr veto flag ``coincident.spms`` is available.
+    aoe_model
+        ``pulse_lib``, ``single_temp`` or `None` without simulated PSD.
+    fccd_thr
+        energy threshold in keV of the FCCD tag, or `None` without it.
+    """
+    levels = []
+    if has_spms_coinc:
+        levels.append(
+            {
+                "is_spms_coincident": "light seen by the SiPMs (fails the LAr veto)",
+                "not_spms_coincident": "no light seen by the SiPMs (passes the LAr veto)",
+            }
+        )
+    if aoe_model is not None:
+        aoe_level = {}
+        # the single template has no high-side cut
+        if aoe_model == "pulse_lib":
+            aoe_level["is_high_aoe"] = "A/E above the high-side cut"
+        aoe_level["is_ss_aoe"] = "single-site A/E (passes the A/E cuts)"
+        aoe_level["is_low_aoe"] = "A/E below the low-side cut (multi-site)"
+        aoe_level["is_invalid_aoe"] = "no valid or simulated A/E"
+        levels.append(aoe_level)
+    if fccd_thr is not None:
+        levels.append(
+            {
+                "is_fccd_tagged": f"more than {fccd_thr} keV deposited in the FCCD layer",
+                "not_fccd_tagged": f"at most {fccd_thr} keV deposited in the FCCD layer",
+            }
+        )
+    return levels
+
+
 def lar_categories(evt: ak.Array) -> dict[str, np.ndarray]:
     """Return the event masks of the LAr veto categories.
 
@@ -295,14 +340,6 @@ def fccd_by_uid(
     return uids, fccd_mm
 
 
-def _to_struct(node: dict) -> Struct:
-    """Convert nested dicts to nested LGDO structs."""
-    # not Mapping: an LGDO Histogram is a Mapping and must stay as is
-    return Struct(
-        {k: _to_struct(v) if isinstance(v, dict) else v for k, v in node.items()}
-    )
-
-
 def format_pdf_struct(
     histograms: Mapping[str, Mapping[str, hist.Hist]],
     descriptions: Mapping[str, str],
@@ -318,18 +355,13 @@ def format_pdf_struct(
         description of each path, stored in the ``description`` attribute of
         its histograms.
     """
-    tree: dict = {}
+    output = Struct()
     for path, per_group in histograms.items():
-        node = tree
-        for level in path.split("/"):
-            node = node.setdefault(level, {})
-        node.update(
-            {
-                g: Histogram(h, attrs={"description": descriptions[path]})
-                for g, h in per_group.items()
-            }
-        )
-    return _to_struct(tree)
+        for g, h in per_group.items():
+            output.add_field(
+                f"{path}/{g}", Histogram(h, attrs={"description": descriptions[path]})
+            )
+    return output
 
 
 def read_pdf(
