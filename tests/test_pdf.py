@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import itertools
+
 import awkward as ak
 import hist
 import lh5
 import numpy as np
 import pytest
+from lgdo import Histogram
 
 from legendsimflow.pdf import (
     aoe_categories,
@@ -13,6 +16,7 @@ from legendsimflow.pdf import (
     fccd_categories,
     format_pdf_struct,
     lar_categories,
+    read_pdf,
     validate_grid,
 )
 
@@ -193,3 +197,33 @@ def test_format_pdf_struct():
 
     assert struct["mul1"]["a"]["b"]["all"].attrs["description"] == "B"
     assert struct["mul1"]["a"]["c"]["all"].attrs["description"] == "C"
+
+
+def test_read_pdf(tmp_path):
+    # one event at energy n keV in each category n, in both groups
+    lar = ("is_spms_coincident", "not_spms_coincident")
+    aoe = ("is_ss_aoe", "is_low_aoe")
+    histograms, descriptions = {}, {}
+    for n, (lar_cat, aoe_cat) in enumerate(itertools.product(lar, aoe)):
+        path = f"mul1/{lar_cat}/{aoe_cat}"
+        histograms[path] = {}
+        for g in ("all", "icpc"):
+            histograms[path][g] = hist.new.Reg(10, 0, 10).Double()
+            histograms[path][g].fill([n])
+        descriptions[path] = path
+    struct = format_pdf_struct(histograms, descriptions)
+    struct.add_field("mul2", Histogram(hist.new.Reg(10, 0, 10).Reg(10, 0, 10).Double()))
+    pdf_file = tmp_path / "pdf.lh5"
+    lh5.write(struct, "pdf", pdf_file)
+
+    def _counts(*args, **kwargs):
+        return read_pdf(pdf_file, *args, **kwargs).values()[:4].tolist()
+
+    assert _counts() == [1, 1, 1, 1]
+    assert _counts("mul1/not_spms_coincident") == [0, 0, 1, 1]
+    assert _counts("mul1/*/is_ss_aoe") == [1, 0, 1, 0]
+    assert _counts(["mul1/*/is_ss_aoe", "mul1/is_spms_coincident"]) == [1, 1, 1, 0]
+    assert _counts("mul1/not_spms_coincident/is_low_aoe", group="icpc") == [0, 0, 0, 1]
+
+    with pytest.raises(ValueError, match="no histogram"):
+        read_pdf(pdf_file, "mul1/*/is_high_aoe")

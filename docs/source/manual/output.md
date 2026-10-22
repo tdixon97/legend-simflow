@@ -426,8 +426,8 @@ other scripts can use too.
 | LAr   | `is_spms_coincident`  | light seen by the SiPMs (`coincident.spms` is `True`), i.e. the event fails the LAr veto      |
 | LAr   | `not_spms_coincident` | no light seen by the SiPMs (`coincident.spms` is `False`), i.e. the event passes the LAr veto |
 | A/E   | `is_high_aoe`         | A/E above the high-side cut (`is_high_aoe`). Pulse-shape library only                         |
-| A/E   | `is_ss_aoe`           | single-site: A/E above the low-side cut (`is_single_site`) and not above the high-side cut    |
-| A/E   | `is_low_aoe`          | multi-site: A/E below the low-side cut and not above the high-side cut                        |
+| A/E   | `is_ss_aoe`           | single-site: A/E above the low-side cut (`is_single_site`) and below the high-side cut        |
+| A/E   | `is_low_aoe`          | multi-site: A/E below the low-side cut                                                        |
 | A/E   | `is_invalid_aoe`      | no A/E available: `psd.is_good` or `has_aoe` is `False`                                       |
 | FCCD  | `is_fccd_tagged`      | more than `fccd_tag_energy_thr_kev` deposited in the FCCD layer                               |
 | FCCD  | `not_fccd_tagged`     | at most `fccd_tag_energy_thr_kev` deposited in the FCCD layer                                 |
@@ -439,10 +439,10 @@ single-template model (`psd.single_temp`) when it runs with `simulate_psd` (see
 `is_high_aoe` is absent. This gives 8 categories with the pulse-shape library
 and 6 with the single template, twice as many with the FCCD level.
 
-`is_invalid_aoe` holds events with a detector that is ON with valid PSD in data,
-but whose PSD response could not be simulated (e.g. because it is not included
-in the simulation model), or that has no valid PSD in data. An analysis applying
-an A/E cut treats these events as background.
+`is_invalid_aoe` holds events with a detector that is ON but whose PSD response
+could not be simulated (e.g. because it is not included in the simulation
+model), or that has no valid PSD in data. An analysis applying an A/E cut treats
+these events as background.
 
 The FCCD level is present only when `fccd_tag_energy_thr_kev` is set (see
 {ref}`pdf-tier-settings`). The energy in the FCCD layer is the sum of the
@@ -458,11 +458,18 @@ with neither `simulate_psd` nor `simulate_psd_with_psl`. For example, with
 
 :::{tip}
 
-Any other selection is a sum of categories. For example, the spectrum after the
-LAr veto and the low- and high-side A/E cuts is
-`mul1/not_spms_coincident/is_ss_aoe`. The spectrum after the LAr veto alone is
-the sum of all A/E categories below `mul1/not_spms_coincident`, and the
-multiplicity-1 spectrum is the sum of all categories.
+Any other selection is a sum of categories, which
+{func}`legendsimflow.pdf.read_pdf` reads directly. A path selects every category
+below it, and `*` matches any category at its level:
+
+```python
+from legendsimflow.pdf import read_pdf
+
+read_pdf("pdf.lh5")  # all multiplicity-1 events
+read_pdf("pdf.lh5", "mul1/not_spms_coincident")  # after the LAr veto
+read_pdf("pdf.lh5", "mul1/*/is_ss_aoe")  # after the A/E cuts only
+read_pdf("pdf.lh5", "mul1/not_spms_coincident/is_ss_aoe", group="icpc")
+```
 
 :::
 

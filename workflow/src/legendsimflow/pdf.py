@@ -18,19 +18,25 @@
   take events of the `evt` (or `cvt`) tier as :class:`awkward.Array` and
   return one event mask per category. Each event is in exactly one category
   of each level.
-- the output struct of the pdf tier.
+- the output struct of the pdf tier, and reading the sum of its categories.
 - spectra on a grid of parameters, in the layout Refit.jl reads as a
   generalised histogram.
 """
 
 from __future__ import annotations
 
+import functools
 import itertools
 import logging
-from collections.abc import Callable, Mapping
+import operator
+from collections.abc import Callable, Iterable, Mapping
+from fnmatch import fnmatch
+from pathlib import Path
 
 import awkward as ak
+import h5py
 import hist
+import lh5
 import numpy as np
 from lgdo import Histogram, Scalar, Struct
 
@@ -324,3 +330,65 @@ def format_pdf_struct(
             }
         )
     return _to_struct(tree)
+
+
+def read_pdf(
+    lh5_file: str | Path,
+    selection: str | Iterable[str] = "mul1",
+    group: str = "all",
+) -> hist.Hist:
+    """Read the sum of the 1D histograms of the pdf tier below one or more paths.
+
+    The categories of the pdf tier do not overlap, so any selection is a sum
+    of categories. A path in `selection` selects every category below it,
+    and ``*`` matches any category at its level.
+
+    Parameters
+    ----------
+    lh5_file
+        output file of the pdf tier.
+    selection
+        path or paths below ``pdf/``, without the detector group.
+    group
+        detector group.
+
+    Examples
+    --------
+    >>> read_pdf("pdf.lh5")  # all multiplicity-1 events
+    >>> read_pdf("pdf.lh5", "mul1/not_spms_coincident")  # after the LAr veto
+    >>> read_pdf("pdf.lh5", "mul1/*/is_ss_aoe")  # after the A/E cuts only
+    >>> read_pdf(
+    ...     "pdf.lh5",
+    ...     ["mul1/*/is_ss_aoe", "mul1/*/is_low_aoe"],  # after the high-side A/E cut
+    ...     group="icpc",
+    ... )
+    """
+    patterns = [selection] if isinstance(selection, str) else list(selection)
+    patterns = [pat.strip("/").split("/") for pat in patterns]
+
+    paths = []
+    with h5py.File(lh5_file, "r") as f:
+        f["pdf"].visititems(
+            lambda name, obj: paths.append(name)
+            if isinstance(obj, h5py.Group) and "binning" in obj
+            else None
+        )
+
+    selected = []
+    for path in paths:
+        *levels, g = path.split("/")
+        if g == group and any(
+            len(levels) >= len(pat)
+            and all(fnmatch(level, p) for level, p in zip(levels, pat, strict=False))
+            for pat in patterns
+        ):
+            selected.append(path)
+
+    if not selected:
+        msg = f"no histogram of group {group!r} matches {selection!r} in {lh5_file}"
+        raise ValueError(msg)
+
+    return functools.reduce(
+        operator.add,
+        (lh5.read_as(f"pdf/{path}", str(lh5_file), "hist") for path in selected),
+    )
