@@ -216,14 +216,14 @@ def test_read_pdf(tmp_path):
     pdf_file = tmp_path / "pdf.lh5"
     lh5.write(struct, "pdf", pdf_file)
 
-    def _counts(*args, **kwargs):
-        return read_pdf(pdf_file, *args, **kwargs).values()[:4].tolist()
+    def _counts(selection, **kwargs):
+        return read_pdf(selection, pdf_file, **kwargs).values()[:4].tolist()
 
-    assert _counts() == [1, 1, 1, 1]
+    assert _counts("mul1") == [1, 1, 1, 1]
     assert _counts("mul1/not_spms_coincident") == [0, 0, 1, 1]
     assert _counts("mul1/*/is_ss_aoe") == [1, 0, 1, 0]
     assert _counts(["mul1/*/is_ss_aoe", "mul1/is_spms_coincident"]) == [1, 1, 1, 0]
     assert _counts("mul1/not_spms_coincident/is_low_aoe", group="icpc") == [0, 0, 0, 1]
 
     with pytest.raises(ValueError, match="no histogram"):
-        read_pdf(pdf_file, "mul1/*/is_high_aoe")
+        read_pdf("mul1/*/is_high_aoe", pdf_file)

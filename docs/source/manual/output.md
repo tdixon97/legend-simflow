@@ -465,10 +465,10 @@ below it, and `*` matches any category at its level:
 ```python
 from legendsimflow.pdf import read_pdf
 
-read_pdf("pdf.lh5")  # all multiplicity-1 events
-read_pdf("pdf.lh5", "mul1/not_spms_coincident")  # after the LAr veto
-read_pdf("pdf.lh5", "mul1/*/is_ss_aoe")  # after the A/E cuts only
-read_pdf("pdf.lh5", "mul1/not_spms_coincident/is_ss_aoe", group="icpc")
+read_pdf("mul1", "pdf.lh5")  # all multiplicity-1 events
+read_pdf("mul1/not_spms_coincident", "pdf.lh5")  # after the LAr veto
+read_pdf("mul1/*/is_ss_aoe", "pdf.lh5")  # after the A/E cuts only
+read_pdf("mul1/not_spms_coincident/is_ss_aoe", "pdf.lh5", group="icpc")
 ```
 
 :::

@@ -333,8 +333,8 @@ def format_pdf_struct(
 
 
 def read_pdf(
+    selection: str | Iterable[str],
     lh5_file: str | Path,
-    selection: str | Iterable[str] = "mul1",
     group: str = "all",
 ) -> hist.Hist:
     """Read the sum of the 1D histograms of the pdf tier below one or more paths.
@@ -345,21 +345,21 @@ def read_pdf(
 
     Parameters
     ----------
-    lh5_file
-        output file of the pdf tier.
     selection
         path or paths below ``pdf/``, without the detector group.
+    lh5_file
+        output file of the pdf tier.
     group
         detector group.
 
     Examples
     --------
-    >>> read_pdf("pdf.lh5")  # all multiplicity-1 events
-    >>> read_pdf("pdf.lh5", "mul1/not_spms_coincident")  # after the LAr veto
-    >>> read_pdf("pdf.lh5", "mul1/*/is_ss_aoe")  # after the A/E cuts only
+    >>> read_pdf("mul1", "pdf.lh5")  # all multiplicity-1 events
+    >>> read_pdf("mul1/not_spms_coincident", "pdf.lh5")  # after the LAr veto
+    >>> read_pdf("mul1/*/is_ss_aoe", "pdf.lh5")  # after the A/E cuts only
     >>> read_pdf(
-    ...     "pdf.lh5",
     ...     ["mul1/*/is_ss_aoe", "mul1/*/is_low_aoe"],  # after the high-side A/E cut
+    ...     "pdf.lh5",
     ...     group="icpc",
     ... )
     """
