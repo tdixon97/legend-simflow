@@ -37,7 +37,7 @@ CONFIG: dict = {
     "simlist_exclude": [],
     "runlist": None,
     "make_steps": ["vtx", "stp", "par", "opt", "hit", "evt", "cvt", "pdf"],
-    "legend_metadata_version": None,
+    "metadata_version": None,
     "validate_l200data": True,
     "simflow_rng_seed": 0,
     "benchmark": {"enabled": False},

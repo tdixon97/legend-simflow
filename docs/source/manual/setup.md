@@ -58,7 +58,7 @@ and of the optional fields of the settings files in the Simflow metadata (see
     outputs cumulatively for all steps up to `hit` that are present in
     `make_steps`. Steps not listed are skipped even in the cumulative pass.
 
-- `legend_metadata_version`: optionally specify a revision (anything that
+- `metadata_version`: optionally specify a revision (anything that
   `git checkout` accepts) for the _legend-metadata_ instance used by the
   simflow. If you are _developing_ metadata, comment this option. The revision
   must contain the HPGe operational voltages in `hardware/configuration/opvs/`.

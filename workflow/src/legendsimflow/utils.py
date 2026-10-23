@@ -315,6 +315,15 @@ def init_simflow_context(
     ):
         config = raw_config
     else:
+        raw_config = dict(raw_config)
+        if "legend_metadata_version" in raw_config:
+            log_.warning(
+                "`legend_metadata_version` is deprecated; use `metadata_version` instead"
+            )
+            raw_config.setdefault(
+                "metadata_version", raw_config["legend_metadata_version"]
+            )
+            del raw_config["legend_metadata_version"]
         raw_config = defaults.merge(raw_config, defaults.CONFIG)
 
         if workflow is None:
@@ -346,11 +355,11 @@ def init_simflow_context(
         # NOTE: this will attempt a clone of the metadata, if the directory does not exist
         metadata = metadata_cls(config.paths.metadata, lazy=True)
 
-        if config.legend_metadata_version is not None:
-            msg = f"checking out metadata version {config.legend_metadata_version}"
+        if config.metadata_version is not None:
+            msg = f"checking out metadata version {config.metadata_version}"
             log_.info(msg)
             try:
-                metadata.checkout(config.legend_metadata_version)
+                metadata.checkout(config.metadata_version)
             except GitCommandError as e:
                 msg = f"could not checkout metadata version: {e}"
                 log_.warning(msg)

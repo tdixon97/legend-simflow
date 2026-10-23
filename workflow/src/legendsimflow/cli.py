@@ -81,17 +81,23 @@ def snakemake_nersc_cli():
         use_env=True,
         ignore_missing=False,
     )
+    if "legend_metadata_version" in config:
+        log.warning(
+            "`legend_metadata_version` is deprecated; use `metadata_version` instead"
+        )
+        config.setdefault("metadata_version", config["legend_metadata_version"])
+        del config["legend_metadata_version"]
     config = defaults.merge(config, defaults.CONFIG)
 
     # NOTE: this will attempt a clone of the metadata, if the directory does not exist
     metadata = metadata_class(config)(config.paths.metadata, lazy=True)
 
-    if config.legend_metadata_version is not None:
+    if config.metadata_version is not None:
         log.info(
             "checking out metadata version %s",
-            config.legend_metadata_version,
+            config.metadata_version,
         )
-        metadata.checkout(config.legend_metadata_version)
+        metadata.checkout(config.metadata_version)
 
     config["metadata"] = metadata
 
