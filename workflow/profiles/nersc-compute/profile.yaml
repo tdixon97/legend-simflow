@@ -13,9 +13,9 @@ local-storage-prefix: $SCRATCH/legend-simflow/$HOSTNAME
 resources:
   mem_mb: 480000
 
-# 512 GB for 256 hardware threads: 2 GB per thread
+# 1.5 GB per thread by default, so that all 256 hardware threads can be used
 default-resources:
-  mem_mb: 2000 * threads
+  mem_mb: 1500 * threads
 
 set-resources:
   # measured up to 2.5 GB

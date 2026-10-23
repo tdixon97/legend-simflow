@@ -36,14 +36,17 @@ set-resource-scopes:
   runtime: local
   mem_mb: local
 
+default-resources:
+  mem_mb: 1500 * threads
+
 # set per rule defaults, but it's strongly recommended to set per-rule
 # resources on top of this. most rules are quite fast so the default is 1
 # minute
 default-resources:
   nodes: 1
   runtime: 1 # minutes
-  # 512 GB for 256 hardware threads: 2 GB per thread
-  mem_mb: 2000 * threads
+  # 1.5 GB per thread by default, so that all 256 hardware threads can be used
+  mem_mb: 1500 * threads
   slurm_account: m2676
   constraint: cpu
   slurm_extra: --licenses scratch,cfs --mail-type end,fail --mail-user luigi.pertoldi@tum.de
