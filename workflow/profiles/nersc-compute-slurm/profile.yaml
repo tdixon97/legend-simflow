@@ -36,9 +36,6 @@ set-resource-scopes:
   runtime: local
   mem_mb: local
 
-default-resources:
-  mem_mb: 1500 * threads
-
 # set per rule defaults, but it's strongly recommended to set per-rule
 # resources on top of this. most rules are quite fast so the default is 1
 # minute
