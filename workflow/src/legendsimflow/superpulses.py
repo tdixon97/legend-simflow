@@ -975,7 +975,9 @@ def plot_wfs_and_superpulse(
 
     # Shared x range: intersection of the two time axes
 
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10), sharex=True)
+    fig, (ax1, ax2) = plt.subplots(
+        2, 1, figsize=(12, 10), sharex=True, layout="constrained"
+    )
     fig.suptitle(
         f"{superpulse.detector} - {sl}  ({superpulse.n_events_final} events)",
         fontsize=14,
@@ -1032,7 +1034,6 @@ def plot_wfs_and_superpulse(
     ax2.legend(loc="upper right")
     ax2.grid(alpha=0.3, linestyle="--")
 
-    fig.tight_layout()
     return fig, (ax1, ax2)
 
 
@@ -1087,7 +1088,7 @@ def plot_chi2_cut(
     idx_fail = np.where(~mask_pass)[0]
     idx_pass = np.where(mask_pass)[0]
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5), layout="constrained")
     fig.suptitle(f"{final_superpulse.detector} - {sl}", fontsize=14)
 
     # Left: histogram
@@ -1145,7 +1146,6 @@ def plot_chi2_cut(
     ax2.grid(alpha=0.3, linestyle="--")
     ax2.legend(loc="upper left")
 
-    fig.tight_layout()
     return fig, (ax1, ax2)
 
 
