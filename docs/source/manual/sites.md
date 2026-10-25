@@ -182,8 +182,8 @@ jobs: each `simlist` item counts as many jobs as the `number_of_jobs` of its
 `simid` in the `stp` tier configuration. This is equivalent to something like:
 
 ```sh
-srun -N1 -n1 snakemake --workflow-profile workflow/profiles/nersc-compute --config simlist=LIST1 [SNAKEMAKE ARGS] &
-srun -N1 -n1 snakemake --workflow-profile workflow/profiles/nersc-compute --config simlist=LIST2 [SNAKEMAKE ARGS] &
+srun -N1 -n1 snakemake --workflow-profile workflow/profiles/nersc-compute --nolock --config simlist=LIST1 [SNAKEMAKE ARGS] &
+srun -N1 -n1 snakemake --workflow-profile workflow/profiles/nersc-compute --nolock --config simlist=LIST2 [SNAKEMAKE ARGS] &
 ...
 
 wait

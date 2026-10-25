@@ -142,6 +142,7 @@ def snakemake_nersc_cli():
             "snakemake",
             "--workflow-profile",
             "workflow/profiles/nersc-compute",
+            "--nolock",
             "--config",
             "simlist=" + ",".join(simlist_chunk),
             *extra,

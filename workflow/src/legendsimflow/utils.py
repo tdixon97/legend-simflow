@@ -412,18 +412,18 @@ def setup_logdir_link(config: SimflowConfig) -> None:
     ----------
     config
         Simflow configuration object.
-    proctime
-        Processing time identifier for the log directory.
 
     """
     logdir = Path(config.paths.log)
     logdir.mkdir(parents=True, exist_ok=True)
 
-    # create a handy link to access latest log directory
-    link = logdir / "latest"
-    if link.exists() or link.is_symlink():
-        link.unlink()
-    link.symlink_to(config._proctime, target_is_directory=True)
+    # create a handy link to access latest log directory. Several Snakemake
+    # instances may run this at the same time (multi-node runs), so the link
+    # is created under a unique name and renamed over "latest" in one step
+    tmp_link = logdir / f".latest.{os.getpid()}"
+    tmp_link.unlink(missing_ok=True)
+    tmp_link.symlink_to(config._proctime, target_is_directory=True)
+    tmp_link.replace(logdir / "latest")
 
 
 def write_warnings_report(logdir: str | Path) -> tuple[Path, int]:
