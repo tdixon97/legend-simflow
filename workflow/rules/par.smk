@@ -19,7 +19,7 @@ from pathlib import Path
 
 from legendsimflow import aggregate, patterns, utils
 from legendsimflow.exceptions import SimflowConfigError
-from legendsimflow.metadata import get_par_settings
+from legendsimflow.metadata import get_par_settings, simpars
 
 # tuned HPGe impurity profiles, from a separate impurity-tuning production
 _impurity_model = config.paths.get("hpge_impurity_model", None)
@@ -44,10 +44,15 @@ if _ssd_scan_grid_size is None:
 
 
 def smk_curr_mwa(wildcards):
-    """Return the moving-window-average settings of the simulated current."""
     return utils.lookup_curr_mw_pars(
         config.paths.get("l200data", None),
         settings=get_par_settings(config, "elecmod").curr_mwa,
+    )
+
+
+def smk_simpars(par):
+    return lambda wc: simpars(
+        config.metadata, par, wc.runid, config.experiment, default=None
     )
 
 
@@ -366,7 +371,6 @@ rule convolve_hpge_ideal_pulse_shape_lib:
             config, runid=wc.runid
         ),
     params:
-        # track the current smoothing so the rule reruns when it changes
         _curr_mwa=smk_curr_mwa,
     output:
         psl_file=patterns.output_realistic_psl_filename(config),
@@ -422,6 +426,7 @@ rule extract_current_pulse_model:
         # track l200data so the rule reruns when it changes: inputs are
         # discovered dynamically and not listed above
         _l200data=config.paths.get("l200data", None),
+        _currmod=smk_simpars("geds.currmod"),
     output:
         pars_file=temp(patterns.output_currmod_filename(config)),
         plot_file=patterns.plot_currmod_filename(config),
@@ -893,6 +898,8 @@ rule extract_electronics_model_pars:
     params:
         # track the current smoothing so the rule reruns when it changes
         _curr_mwa=smk_curr_mwa,
+        # track the metadata values, read by the script and not listed above
+        _elecmod=smk_simpars("geds.elecmod"),
     output:
         pars_file=temp(patterns.output_elecmod_filename(config)),
         plot_file=patterns.plot_elecmod_filename(config),
@@ -966,6 +973,9 @@ rule extract_hpge_observables_models:
         # track l200data so the rule reruns when it changes: the parameter
         # database is discovered dynamically and not listed above
         data_path=config.paths.get("l200data", None),
+        _eresmod=smk_simpars("geds.eresmod"),
+        _aoeresmod=smk_simpars("geds.aoeresmod"),
+        _psdcuts=smk_simpars("geds.psdcuts"),
     output:
         eresmod_file=patterns.output_eresmod_filename(config),
         aoeresmod_file=patterns.output_aoeresmod_filename(config),

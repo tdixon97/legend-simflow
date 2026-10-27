@@ -794,3 +794,26 @@ def test_runlist_change_reruns_caches(recorded_prod):
     ran = run_prod(recorded_prod)
     assert ran.keys() >= CACHE_RULES
     assert {"runid": "l200-p03-r000-phy"} in ran["merge_hpge_drift_time_maps"]
+
+
+@pytest.mark.parametrize(
+    ("par", "rule"),
+    [
+        ("currmod", "extract_current_pulse_model"),
+        ("elecmod", "extract_electronics_model_pars"),
+        ("eresmod", "extract_hpge_observables_models"),
+        ("aoeresmod", "extract_hpge_observables_models"),
+        ("psdcuts", "extract_hpge_observables_models"),
+    ],
+)
+def test_simpars_change_reruns_par_jobs(recorded_prod, par, rule):
+    pars_dir = recorded_prod["metadata"] / f"simprod/config/pars/legend/geds/{par}"
+    pars_file = pars_dir / f"l200-p02-r%-T%-all-{par}.yaml"
+    data = yaml.safe_load(pars_file.read_text())
+    data["V99000A"] = data["V02160A"]
+    pars_file.write_text(yaml.safe_dump(data))
+
+    ran = run_prod(recorded_prod)
+    assert rule in ran
+    assert "build_tier_hit" in ran
+    assert run_prod(recorded_prod) == {}
