@@ -538,8 +538,9 @@ aoemeanmod_default:
   collection depth, i.e. no partial collection).
 - `store_surface_steps` (bool, default `false`) — store the energy depositions
   near the n+ surface, so that the hit energies can be recomputed for other
-  dead-layer models (see {ref}`hit-tier-output`). The `evt` tier then also keeps
-  the hits below its energy threshold (see {ref}`evt-tier`).
+  dead-layer models (see {ref}`hit-tier-output`). The `evt` tier still drops the
+  hits below its energy threshold, so hits that pass the threshold only for
+  another dead-layer model are lost (see {ref}`evt-tier`).
 - `surface_depth_in_mm` (float, default `3`) — depositions closer than this
   distance to the n+ surface are stored in the `surface` subtable. It must
   exceed the largest FCCD applied later: deeper depositions count as fully
