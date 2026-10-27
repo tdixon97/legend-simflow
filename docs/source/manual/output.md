@@ -245,12 +245,6 @@ Constant fields identifying each event.
 Per-event arrays collecting HPGe hits that pass the energy threshold (25 keV)
 and are from non-OFF detectors.
 
-With `store_surface_steps: true` (see {ref}`hit-tier-settings`), the hits below
-the threshold are kept as well. `energy_sum`, `multiplicity` and
-`coincident/geds` still count only the hits above it; select
-`energy > geds_energy_thr_kev` (see {ref}`evt-tier-settings-meta`) before using
-the per-hit fields.
-
 | Field          | Type              | Units | Description                                                                                                                                                                                               |
 | -------------- | ----------------- | ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `energy`       | `VectorOfVectors` | keV   | Hit energies from ON and AC detectors above threshold. Variable-length per event.                                                                                                                         |
@@ -518,3 +512,14 @@ grid = build_pdf_grid(pdf, {"fccd": (0.5, 1.5, 0.1), "dlf": (0, 0.9, 0.3)})
 
 Cuts that depend on the energy, such as the threshold or the multiplicity, are
 applied to the recomputed energies inside `pdf`.
+
+:::{warning}
+
+The `evt` tier drops the hits below the energy threshold (`geds_energy_thr_kev`,
+see {ref}`evt-tier-settings-meta`), computed with the nominal dead-layer model,
+also with `store_surface_steps: true`. A hit below the threshold for the nominal
+model can pass it for a thinner FCCD, but it is missing from the `cvt` file. The
+recomputed PDF is therefore biased near the threshold, and so is the
+multiplicity of the events.
+
+:::

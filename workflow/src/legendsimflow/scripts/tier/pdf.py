@@ -182,8 +182,7 @@ def main() -> None:
             data = chunk.view_as("ak")
             geds = data.geds
 
-            # with store_surface_steps the evt tier also keeps the hits below
-            # the energy threshold: drop them. The multiplicity is counted
+            # apply the energy threshold again. The multiplicity is counted
             # here, not read from geds.multiplicity, so that it matches the
             # float32 energies.
             above_thr = geds.energy > tier_evt_settings.geds_energy_thr_kev
