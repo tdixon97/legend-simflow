@@ -519,7 +519,7 @@ The `evt` tier drops the hits below the energy threshold (`geds_energy_thr_kev`,
 see {ref}`evt-tier-settings-meta`), computed with the nominal dead-layer model,
 also with `store_surface_steps: true`. A hit below the threshold for the nominal
 model can pass it for a thinner FCCD, but it is missing from the `cvt` file. The
-recomputed PDF is therefore wrong for energies close to the threshold, and the
-multiplicity of some events can be too low.
+recomputed PDF is therefore biased near the threshold, and so is the
+multiplicity of the events.
 
 :::
