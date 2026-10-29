@@ -379,11 +379,12 @@ def recompute_hit_energies(
 ) -> ak.Array:
     """Return the HPGe hit energies (keV) for another dead-layer model.
 
-    The energy of each hit is its nominal (smeared) energy plus the change of
-    the energy collected from the depositions in ``geds.surface``, between the
-    nominal and the new dead-layer model (see
-    :func:`piecewise_linear_activeness`). Depositions deeper than
-    ``surface_depth_in_mm`` count as fully active in both models.
+    The collected energy of a hit is ``geds.surface.energy_bulk`` plus the
+    depositions ``geds.surface.edep`` weighted by their activeness (see
+    :func:`piecewise_linear_activeness`). The new energy of each hit is its
+    nominal (smeared) energy, minus its collected energy in the nominal model,
+    plus its collected energy in the new model. The smearing of each hit is
+    therefore kept.
 
     Parameters
     ----------
@@ -404,13 +405,20 @@ def recompute_hit_energies(
     edep = ak.to_numpy(ak.flatten(geds.surface.edep, axis=None))
     distance = ak.to_numpy(ak.flatten(geds.surface.distance_to_nplus, axis=None))
 
-    change = edep * (
-        piecewise_linear_activeness(distance, fccd_mm[step_det], dlf)
-        - piecewise_linear_activeness(distance, fccd_nominal_mm[step_det], dlf_nominal)
+    energy_bulk = ak.to_numpy(ak.flatten(geds.surface.energy_bulk))
+
+    collected_nominal = energy_bulk + np.bincount(
+        step_hit,
+        weights=edep
+        * piecewise_linear_activeness(distance, fccd_nominal_mm[step_det], dlf_nominal),
+        minlength=len(hit_uid),
     )
-    energy = ak.to_numpy(ak.flatten(geds.energy)) + np.bincount(
-        step_hit, weights=change, minlength=len(hit_uid)
+    collected = energy_bulk + np.bincount(
+        step_hit,
+        weights=edep * piecewise_linear_activeness(distance, fccd_mm[step_det], dlf),
+        minlength=len(hit_uid),
     )
+    energy = ak.to_numpy(ak.flatten(geds.energy)) - collected_nominal + collected
     return ak.unflatten(energy, ak.num(geds.energy))
 
 

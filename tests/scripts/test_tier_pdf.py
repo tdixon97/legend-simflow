@@ -282,6 +282,9 @@ def _make_cvt_file_surface(path: Path) -> None:
                     "distance_to_nplus": VectorOfVectors(
                         ak.Array([[[0.5, 2.0]], [[0.3]], [[1.0], [0.1]], [[], [], []]])
                     ),
+                    "energy_bulk": VectorOfVectors(
+                        data=[[975.0], [985.0], [799.0, 0.0], [300.0, 400.0, 5.0]]
+                    ),
                 }
             ),
         }
@@ -312,6 +315,9 @@ def test_pdf_energy_threshold(tmp_path, monkeypatch):
     mul2 = _hist("pdf/mul2/all")
     assert mul2.sum() == 1
     assert mul2[300j, 400j] == 1
+
+    # the dead-layer grids are built only with morph_dead_layer
+    assert not _exists(pdf_file, "pdf_morph")
 
 
 def test_pdf_fccd_tag(tmp_path, monkeypatch):

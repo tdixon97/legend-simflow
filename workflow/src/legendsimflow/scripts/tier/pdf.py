@@ -269,6 +269,8 @@ def main() -> None:
             fields += ["geds/psd/is_good", f"geds/psd/{aoe_model}"]
         if fccd_thr is not None or morph:
             fields += ["geds/surface/edep", "geds/surface/distance_to_nplus"]
+        if morph:
+            fields.append("geds/surface/energy_bulk")
 
         # a single cvt file might be large, need to iterate
         for chunk in lh5.LH5Iterator(

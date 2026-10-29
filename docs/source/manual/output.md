@@ -500,12 +500,13 @@ the layout of {func}`legendsimflow.pdf.build_pdf_grid`, with two axes:
 - `dlf`: the dead layer fraction.
 
 At each grid point, the hit energies are recomputed with
-{func}`legendsimflow.pdf.recompute_hit_energies`. The energy threshold, the
-multiplicity and the FCCD categories are then applied to the recomputed
-energies, with the shifted FCCD. The A/E and LAr categories are not recomputed.
-The grid point with `fccd_sigma = 0` and the `dead_layer_fraction` of the `hit`
-tier gives the PDFs of `pdf/`, if this point is on the grid and the FCCD is in
-the allowed range.
+{func}`legendsimflow.pdf.recompute_hit_energies`, from `geds/surface/edep`,
+`geds/surface/distance_to_nplus` and `geds/surface/energy_bulk`. The energy
+threshold, the multiplicity and the FCCD categories are then applied to the
+recomputed energies, with the shifted FCCD. The A/E and LAr categories are not
+recomputed. The grid point with `fccd_sigma = 0` and the `dead_layer_fraction`
+of the `hit` tier gives the PDFs of `pdf/`, if this point is on the grid and the
+FCCD is in the allowed range.
 
 Each grid point holds a full set of 1D histograms, about 50 kB each. Keep the
 number of grid points times the number of histograms in `pdf/` small enough for
@@ -529,13 +530,20 @@ surface = ak.to_packed(geds.surface[in_det])  # copy the hits of the detector
 energy = ak.flatten(geds.energy[in_det])
 dist = ak.flatten(surface.distance_to_nplus)
 edep = ak.flatten(surface.edep)
-act_nominal = piecewise_linear_activeness(dist, fccd, dlf)
+energy_bulk = ak.flatten(surface.energy_bulk)
+
+
+def collected(fccd, dlf):
+    act = piecewise_linear_activeness(dist, fccd, dlf)
+    return energy_bulk + ak.sum(edep * act, axis=-1)
+
+
+collected_nominal = collected(fccd, dlf)
 
 
 def pdf(pars):
-    act = piecewise_linear_activeness(dist, pars["fccd"], pars["dlf"])
-    # nominal (smeared) energy plus the change of the collected energy
-    e = energy + ak.sum(edep * (act - act_nominal), axis=-1)
+    # nominal (smeared) energy with the nominal collected energy replaced
+    e = energy - collected_nominal + collected(pars["fccd"], pars["dlf"])
     return hist.new.Reg(6000, 0, 6000).Double().fill(e[e > 25])  # keV threshold
 
 

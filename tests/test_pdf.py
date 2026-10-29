@@ -208,6 +208,7 @@ def test_recompute_hit_energies():
             "surface": {
                 "edep": [[[10.0, 20.0]], [[], [5.0]]],
                 "distance_to_nplus": [[[0.5, 2.0]], [[], [0.5]]],
+                "energy_bulk": [[970.0], [800.0, 295.0]],
             },
         }
     )
