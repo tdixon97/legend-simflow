@@ -8,6 +8,7 @@ import lh5
 import numpy as np
 import pytest
 from lgdo import Histogram
+from reboost.math.functions import piecewise_linear_activeness as reference
 
 from legendsimflow.pdf import (
     aoe_categories,
@@ -16,7 +17,9 @@ from legendsimflow.pdf import (
     fccd_categories,
     format_pdf_struct,
     lar_categories,
+    piecewise_linear_activeness,
     read_pdf,
+    recompute_hit_energies,
     validate_grid,
 )
 
@@ -186,6 +189,40 @@ def test_fccd_by_uid(config, caplog):
         _, fccd_mm = fccd_by_uid(config.metadata, {"V99000A": 5}, surface_depth=0.5)
     assert fccd_mm.tolist() == [0.5]
     assert "exceeds surface_depth_in_mm" in caplog.text
+
+
+@pytest.mark.parametrize("dlf", [0, 0.5, 1])
+def test_piecewise_linear_activeness(dlf):
+    distance = np.array([0, 0.2, 0.5, 0.9, 1.0, 1.5])
+    assert piecewise_linear_activeness(distance, 1.0, dlf) == pytest.approx(
+        reference(ak.Array(distance), 1.0, dlf).to_numpy()
+    )
+
+
+def test_recompute_hit_energies():
+    # the first detector (UID 1) has its FCCD changed, the second not
+    geds = ak.Array(
+        {
+            "energy": [[1000.0], [800.0, 300.0]],
+            "rawid": [[1], [1, 2]],
+            "surface": {
+                "edep": [[[10.0, 20.0]], [[], [5.0]]],
+                "distance_to_nplus": [[[0.5, 2.0]], [[], [0.5]]],
+            },
+        }
+    )
+    uids = np.array([1, 2])
+    fccd = np.array([1.0, 1.0])
+
+    same = recompute_hit_energies(geds, uids, fccd, 0.5, fccd, 0.5)
+    assert ak.all(same == geds.energy)
+
+    # activeness at 0.5 mm: 0 with FCCD 1 mm and DLF 0.5, 0.5 with DLF 0
+    energy = recompute_hit_energies(geds, uids, fccd, 0.5, np.array([1.0, 1.0]), 0)
+    assert energy.tolist() == [[1005.0], [800.0, 302.5]]
+
+    energy = recompute_hit_energies(geds, uids, fccd, 0.5, np.array([0.5, 1.0]), 0.5)
+    assert energy.tolist() == [[1010.0], [800.0, 300.0]]
 
 
 def test_format_pdf_struct():

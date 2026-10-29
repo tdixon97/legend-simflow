@@ -84,7 +84,7 @@ def build_pdf_grid(
     grid_info = Struct()
     values = {}
     for d, (name, (first, last, step)) in enumerate(axes.items()):
-        values[name] = first + step * np.arange(round((last - first) / step) + 1)
+        values[name] = grid_axis_values(first, last, step)
         grid_info.add_field(f"axis_{d}/name", Scalar(name))
         for key, value in (("first", first), ("last", last), ("step", step)):
             grid_info.add_field(f"axis_{d}/values/{key}", Scalar(float(value)))
@@ -110,6 +110,11 @@ def build_pdf_grid(
 
     # one grid if pdf returns one histogram
     return grids.get(None, grids)
+
+
+def grid_axis_values(first: float, last: float, step: float) -> np.ndarray:
+    """Return the values of a grid axis of :func:`build_pdf_grid`."""
+    return first + step * np.arange(round((last - first) / step) + 1)
 
 
 def validate_grid(grid: Struct) -> None:
@@ -338,6 +343,75 @@ def fccd_by_uid(
             )
             fccd_mm[i] = surface_depth
     return uids, fccd_mm
+
+
+def piecewise_linear_activeness(
+    distance: np.ndarray, fccd_mm: np.ndarray | float, dlf: float
+) -> np.ndarray:
+    """Return the charge-collection efficiency of energy depositions near the n+ surface.
+
+    Same model as :func:`reboost.math.functions.piecewise_linear_activeness`,
+    but with one FCCD per deposition: 0 up to ``dlf * fccd_mm`` from the
+    surface, rising linearly to 1 at `fccd_mm`, and 1 beyond.
+
+    Parameters
+    ----------
+    distance
+        distance of each deposition to the n+ surface in mm.
+    fccd_mm
+        FCCD in mm, for each deposition or for all.
+    dlf
+        dead layer fraction, the fraction of the FCCD that is fully inactive.
+    """
+    dead = fccd_mm * dlf
+    with np.errstate(divide="ignore", invalid="ignore"):
+        linear = (distance - dead) / (fccd_mm - dead)
+    return np.where(distance <= dead, 0.0, np.where(distance > fccd_mm, 1.0, linear))
+
+
+def recompute_hit_energies(
+    geds: ak.Array,
+    uids: np.ndarray,
+    fccd_nominal_mm: np.ndarray,
+    dlf_nominal: float,
+    fccd_mm: np.ndarray,
+    dlf: float,
+) -> ak.Array:
+    """Return the HPGe hit energies (keV) for another dead-layer model.
+
+    The energy of each hit is its nominal (smeared) energy plus the change of
+    the energy collected from the depositions in ``geds.surface``, between the
+    nominal and the new dead-layer model (see
+    :func:`piecewise_linear_activeness`). Depositions deeper than
+    ``surface_depth_in_mm`` count as fully active in both models.
+
+    Parameters
+    ----------
+    geds
+        HPGe hits of the `evt` tier, with the ``surface`` subtable.
+    uids
+        sorted detector UIDs.
+    fccd_nominal_mm, fccd_mm
+        nominal and new FCCD in mm of each detector in `uids`.
+    dlf_nominal, dlf
+        nominal and new dead layer fraction.
+    """
+    hit_uid = ak.to_numpy(ak.flatten(geds.rawid))
+    hit_det = np.searchsorted(uids, hit_uid)
+    n_steps = ak.to_numpy(ak.flatten(ak.num(geds.surface.edep, axis=-1)))
+    step_hit = np.repeat(np.arange(len(hit_uid)), n_steps)
+    step_det = hit_det[step_hit]
+    edep = ak.to_numpy(ak.flatten(geds.surface.edep, axis=None))
+    distance = ak.to_numpy(ak.flatten(geds.surface.distance_to_nplus, axis=None))
+
+    change = edep * (
+        piecewise_linear_activeness(distance, fccd_mm[step_det], dlf)
+        - piecewise_linear_activeness(distance, fccd_nominal_mm[step_det], dlf_nominal)
+    )
+    energy = ak.to_numpy(ak.flatten(geds.energy)) + np.bincount(
+        step_hit, weights=change, minlength=len(hit_uid)
+    )
+    return ak.unflatten(energy, ak.num(geds.energy))
 
 
 def format_pdf_struct(
