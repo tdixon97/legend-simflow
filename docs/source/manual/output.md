@@ -499,14 +499,14 @@ the layout of {func}`legendsimflow.pdf.build_pdf_grid`, with two axes:
   `surface_depth_in_mm`;
 - `dlf`: the dead layer fraction.
 
-At each grid point, the hit energies are recomputed with
-{func}`legendsimflow.pdf.recompute_hit_energies`, from `geds/surface/edep`,
-`geds/surface/distance_to_nplus` and `geds/surface/energy_bulk`. The energy
-threshold, the multiplicity and the FCCD categories are then applied to the
-recomputed energies, with the shifted FCCD. The A/E and LAr categories are not
-recomputed. The grid point with `fccd_sigma = 0` and the `dead_layer_fraction`
-of the `hit` tier gives the PDFs of `pdf/`, if this point is on the grid and the
-FCCD is in the allowed range.
+At each grid point, the energy of each hit is its nominal energy plus the change
+of its collected energy (see {func}`legendsimflow.pdf.collected_energy`), from
+`geds/surface/edep`, `geds/surface/distance_to_nplus` and
+`geds/surface/energy_bulk`. The energy threshold, the multiplicity and the FCCD
+categories are then applied to the recomputed energies, with the shifted FCCD.
+The A/E and LAr categories are not recomputed. The grid point with
+`fccd_sigma = 0` and the `dead_layer_fraction` of the `hit` tier gives the PDFs
+of `pdf/`, if this point is on the grid and the FCCD is in the allowed range.
 
 Each grid point holds a full set of 1D histograms, about 50 kB each. Keep the
 number of grid points times the number of histograms in `pdf/` small enough for

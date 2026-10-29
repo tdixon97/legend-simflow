@@ -36,12 +36,13 @@ from legendsimflow.pdf import (
     aoe_categories,
     build_pdf_grid,
     category_levels,
+    collected_energy,
     fccd_by_uid,
     fccd_categories,
+    flatten_surface_steps,
     format_pdf_struct,
     grid_axis_values,
     lar_categories,
-    recompute_hit_energies,
 )
 from legendsimflow.scripts import log_script_invocation
 
@@ -72,49 +73,34 @@ def _detector_group_uids(
 
 def _fill_mul1(
     histograms: Mapping[tuple[str, ...], Mapping[str, hist.Hist]],
-    evt: ak.Array,
-    energy: ak.Array,
+    energy: np.ndarray,
     energy_thr: float,
-    group_uids: Mapping[str, np.ndarray],
-    has_spms_coinc: bool,
-    aoe_model: str | None,
-    fccd_tag: tuple[np.ndarray, np.ndarray, float] | None,
+    hit_evt: np.ndarray,
+    is_good: np.ndarray,
+    in_category: Mapping[str, np.ndarray],
+    in_group: Mapping[str, np.ndarray],
 ) -> None:
     """Fill the multiplicity-1 histograms with the HPGe hit energies `energy` (keV).
 
-    `fccd_tag` is ``(uids, fccd_mm, energy_thr_kev)`` for the FCCD categories.
+    All arrays have one entry per hit; `hit_evt` is the event of each hit.
     """
     # the multiplicity is counted here, not read from geds.multiplicity, so
     # that it matches the float32 or recomputed energies
     above_thr = energy > energy_thr
-    multiplicity = ak.sum(above_thr, axis=-1)
-    is_good = ak.all(evt.geds.quality.is_good_channel[above_thr], axis=-1)
+    multiplicity = np.bincount(hit_evt, weights=above_thr)
+    n_not_good = np.bincount(hit_evt, weights=above_thr & ~is_good)
 
-    # multiplicity-1 events have exactly one hit above threshold
-    is_m1 = (multiplicity == 1) & is_good
-    evt_m1 = evt[is_m1]
-    hit_m1 = above_thr[is_m1]
-    energy_m1 = ak.to_numpy(energy[is_m1][hit_m1][:, 0])
-    uid = ak.to_numpy(evt_m1.geds.rawid[hit_m1][:, 0])
-
-    # event masks of the categories of all levels
-    in_category = {}
-    if has_spms_coinc:
-        in_category |= lar_categories(evt_m1)
-    if aoe_model is not None:
-        in_category |= aoe_categories(evt_m1, hit_m1, aoe_model)
-    if fccd_tag is not None:
-        uids, fccd_mm, thr = fccd_tag
-        fccd_of_hit = fccd_mm[np.searchsorted(uids, uid)]
-        in_category |= fccd_categories(evt_m1, hit_m1, fccd_of_hit, thr)
-
-    in_group = {g: np.isin(uid, uids) for g, uids in group_uids.items()}
+    # the one hit above threshold of the multiplicity-1 events, in an ON detector
+    m1 = np.flatnonzero(
+        above_thr & (multiplicity[hit_evt] == 1) & (n_not_good[hit_evt] == 0)
+    )
+    energy_m1 = energy[m1]
     for combo, per_group_hists in histograms.items():
-        sel = np.ones(len(energy_m1), dtype=bool)
+        sel = np.ones(len(m1), dtype=bool)
         for c in combo:
-            sel &= in_category[c]
+            sel &= in_category[c][m1]
         for g, h in per_group_hists.items():
-            h.fill(energy_m1[sel & in_group[g]])
+            h.fill(energy_m1[sel & in_group[g][m1]])
 
 
 @snakemake_compatible(
@@ -268,9 +254,11 @@ def main() -> None:
         if aoe_model is not None:
             fields += ["geds/psd/is_good", f"geds/psd/{aoe_model}"]
         if fccd_thr is not None or morph:
-            fields += ["geds/surface/edep", "geds/surface/distance_to_nplus"]
-        if morph:
-            fields.append("geds/surface/energy_bulk")
+            fields += [
+                "geds/surface/edep",
+                "geds/surface/distance_to_nplus",
+                "geds/surface/energy_bulk",
+            ]
 
         # a single cvt file might be large, need to iterate
         for chunk in lh5.LH5Iterator(
@@ -290,37 +278,53 @@ def main() -> None:
             energy_m2 = geds.energy[above_thr][(multiplicity == 2) & is_good]
             mul2_hist.fill(ak.min(energy_m2, axis=-1), ak.max(energy_m2, axis=-1))
 
+            # one entry per hit, the categories and groups do not depend on
+            # the dead-layer model
+            hit_evt = np.repeat(np.arange(len(data)), ak.to_numpy(ak.num(geds.energy)))
+            energy = ak.to_numpy(ak.flatten(geds.energy))
+            uid = ak.to_numpy(ak.flatten(geds.rawid))
+            is_good = ak.to_numpy(ak.flatten(geds.quality.is_good_channel))
+            in_category = {}
+            if has_spms_coinc:
+                in_category |= {k: v[hit_evt] for k, v in lar_categories(data).items()}
+            if aoe_model is not None:
+                in_category |= aoe_categories(geds.psd, aoe_model)
+            in_group = {g: np.isin(uid, uids) for g, uids in group_uids.items()}
             fill_args = (
                 tier_evt_settings.geds_energy_thr_kev,
-                group_uids,
-                has_spms_coinc,
-                aoe_model,
+                hit_evt,
+                is_good,
             )
+
+            if fccd_thr is not None or morph:
+                steps = flatten_surface_steps(geds, sorted_uids)
+            if fccd_thr is not None:
+                fccd_tag = fccd_categories(steps, fccd_mm, fccd_thr)
             _fill_mul1(
                 histograms,
-                data,
-                geds.energy,
+                energy,
                 *fill_args,
-                (sorted_uids, fccd_mm, fccd_thr) if fccd_thr is not None else None,
+                in_category | fccd_tag if fccd_thr is not None else in_category,
+                in_group,
             )
+
             if morph:
+                collected_nominal = collected_energy(
+                    steps, fccd_mm, tier_hit_settings.dead_layer_fraction
+                )
                 for (_, dlf), (fccd_morph, hists) in morph_points.items():
-                    energy = recompute_hit_energies(
-                        geds,
-                        sorted_uids,
-                        fccd_mm,
-                        tier_hit_settings.dead_layer_fraction,
-                        fccd_morph,
-                        dlf,
+                    # nominal (smeared) energy plus the change of collected energy
+                    energy_morph = energy + (
+                        collected_energy(steps, fccd_morph, dlf) - collected_nominal
                     )
+                    if fccd_thr is not None:
+                        fccd_tag = fccd_categories(steps, fccd_morph, fccd_thr)
                     _fill_mul1(
                         hists,
-                        data,
-                        energy,
+                        energy_morph,
                         *fill_args,
-                        (sorted_uids, fccd_morph, fccd_thr)
-                        if fccd_thr is not None
-                        else None,
+                        in_category | fccd_tag if fccd_thr is not None else in_category,
+                        in_group,
                     )
 
         log.info("... convert histograms to lgdo")
